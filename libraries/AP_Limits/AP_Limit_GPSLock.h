@@ -6,13 +6,16 @@
 /// @author Andrew Tridgell
 ///         Andreas Antonopoulos
 
-#ifndef __AP_LIMIT_GPSLOCK_H__
-#define __AP_LIMIT_GPSLOCK_H__
+#include <AP_Limits.h>
+#include <AP_Limit_Module.h>
 
-#include "AP_Limits.h"
-#include "AP_Limit_Module.h"
+#ifndef GPS_h
+ #include <GPS.h>
+#endif
 
-#include <GPS.h>
+#ifndef AP_Limit_GPSLock_H
+ #define  AP_Limit_GPSLock_H
+#endif  // AP_Limit_GPSLock_H
 
 class AP_Limit_GPSLock : public AP_Limit_Module {
 
@@ -25,6 +28,6 @@ public:
 
 protected:
     GPS *&                                          _gps;
-};
 
-#endif // __AP_LIMIT_GPSLOCK_H__
+
+};

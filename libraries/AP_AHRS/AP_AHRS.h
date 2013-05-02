@@ -1,7 +1,5 @@
-/// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
-
-#ifndef __AP_AHRS_H__
-#define __AP_AHRS_H__
+#ifndef AP_AHRS_H
+#define AP_AHRS_H
 /*
  *  AHRS (Attitude Heading Reference System) interface for ArduPilot
  *
@@ -18,9 +16,12 @@
 #include <AP_GPS.h>
 #include <AP_InertialSensor.h>
 #include <AP_Baro.h>
-#include <AP_Param.h>
 
-#define AP_AHRS_TRIM_LIMIT 10.0f        // maximum trim angle in degrees
+#if defined(ARDUINO) && ARDUINO >= 100
+ #include "Arduino.h"
+#else
+ #include "WProgram.h"
+#endif
 
 class AP_AHRS
 {
@@ -28,11 +29,9 @@ public:
     // Constructor
     AP_AHRS(AP_InertialSensor *ins, GPS *&gps) :
         _ins(ins),
-        _gps(gps)
+        _gps(gps),
+        _barometer(NULL)
     {
-        // load default values from var_info table
-        AP_Param::setup_object_defaults(this, var_info);
-
         // base the ki values by the sensors maximum drift
         // rate. The APM2 has gyros which are much less drift
         // prone than the APM1, so we should have a lower ki,
@@ -41,31 +40,30 @@ public:
         _gyro_drift_limit = ins->get_gyro_drift_rate();
     }
 
-    // init sets up INS board orientation
-    virtual void init() {
-        _ins->set_board_orientation((enum Rotation)_board_orientation.get());
+    // empty init
+    virtual void init( AP_PeriodicProcess * scheduler = NULL ) {
     };
 
     // Accessors
-    void set_fly_forward(bool b) {
+    void            set_fly_forward(bool b) {
         _fly_forward = b;
     }
-    void set_compass(Compass *compass) {
+    void            set_compass(Compass *compass) {
         _compass = compass;
-        if (_compass != NULL) {
-            _compass->set_board_orientation((enum Rotation)_board_orientation.get());
-        }
     }
-    void set_airspeed(AP_Airspeed *airspeed) {
+    void            set_barometer(AP_Baro *barometer) {
+        _barometer = barometer;
+    }
+    void            set_airspeed(AP_Airspeed *airspeed) {
         _airspeed = airspeed;
     }
 
-    AP_InertialSensor* get_ins() const {
+    AP_InertialSensor*            get_ins() {
 	    return _ins;
     }
 
     // accelerometer values in the earth frame in m/s/s
-    const Vector3f &get_accel_ef(void) const { return _accel_ef; }
+    Vector3f        get_accel_ef(void) { return _accel_ef; }
 
     // Methods
     virtual void update(void) = 0;
@@ -81,14 +79,14 @@ public:
     int32_t yaw_sensor;
 
     // roll and pitch rates in earth frame, in radians/s
-    float get_pitch_rate_earth(void) const;
-    float get_roll_rate_earth(void) const;
+    float get_pitch_rate_earth(void);
+    float get_roll_rate_earth(void);
 
     // return a smoothed and corrected gyro vector
-    virtual const Vector3f get_gyro(void) const = 0;
+    virtual Vector3f get_gyro(void) = 0;
 
     // return the current estimate of the gyro drift
-    virtual const Vector3f &get_gyro_drift(void) const = 0;
+    virtual Vector3f get_gyro_drift(void) = 0;
 
     // reset the current attitude, used on new IMU calibration
     virtual void reset(bool recover_eulers=false) = 0;
@@ -109,14 +107,14 @@ public:
 
     // return a DCM rotation matrix representing our current
     // attitude
-    virtual const Matrix3f &get_dcm_matrix(void) const = 0;
+    virtual Matrix3f get_dcm_matrix(void) = 0;
 
     // get our current position, either from GPS or via
     // dead-reckoning. Return true if a position is available,
     // otherwise false. This only updates the lat and lng fields
     // of the Location
-    virtual bool get_position(struct Location *loc) {
-        if (!_gps || _gps->status() <= GPS::NO_FIX) {
+    bool get_position(struct Location *loc) {
+        if (!_gps || _gps->status() != GPS::GPS_OK) {
             return false;
         }
         loc->lat = _gps->latitude;
@@ -125,25 +123,16 @@ public:
     }
 
     // return a wind estimation vector, in m/s
-    virtual Vector3f wind_estimate(void) {
+    Vector3f wind_estimate(void) {
         return Vector3f(0,0,0);
     }
 
     // return an airspeed estimate if available. return true
     // if we have an estimate
-    virtual bool airspeed_estimate(float *airspeed_ret);
-
-    // return a ground vector estimate in meters/second, in North/East order
-    Vector2f groundspeed_vector(void);
-
-    // return true if we will use compass for yaw
-    virtual bool use_compass(void) const { return _compass && _compass->use_for_yaw(); }
-
-    // correct a bearing in centi-degrees for wind
-    void wind_correct_bearing(int32_t &nav_bearing_cd);
+    bool airspeed_estimate(float *airspeed_ret);
 
     // return true if yaw has been initialised
-    bool yaw_initialised(void) const {
+    bool yaw_initialised(void) {
         return _have_initial_yaw;
     }
 
@@ -152,23 +141,22 @@ public:
         _fast_ground_gains = setting;
     }
 
-    // get trim
-    const Vector3f &get_trim() const { return _trim.get(); }
+    // get strim
+    Vector3f                get_trim() { return _trim; }
 
-    // set trim
-    virtual void            set_trim(Vector3f new_trim);
+    // set_trim
+    virtual void            set_trim(Vector3f new_trim) { _trim.set_and_save(new_trim); }
 
     // add_trim - adjust the roll and pitch trim up to a total of 10 degrees
     virtual void            add_trim(float roll_in_radians, float pitch_in_radians, bool save_to_eeprom = true);
 
     // settable parameters
-    AP_Float beta;
-	AP_Float _kp_yaw;
+    AP_Float _kp_yaw;
     AP_Float _kp;
     AP_Float gps_gain;
     AP_Int8 _gps_use;
+    AP_Int8 _baro_use;
     AP_Int8 _wind_max;
-    AP_Int8 _board_orientation;
 
     // for holding parameters
     static const struct AP_Param::GroupInfo var_info[];
@@ -190,6 +178,7 @@ protected:
     //       IMU under us without our noticing.
     AP_InertialSensor   *_ins;
     GPS                 *&_gps;
+    AP_Baro             *_barometer;
 
     // a vector to capture the difference between the controller and body frames
     AP_Vector3f         _trim;
@@ -209,18 +198,13 @@ protected:
     // accelerometer values in the earth frame in m/s/s
     Vector3f        _accel_ef;
 
-	// Declare filter states for HPF and LPF used by complementary
-	// filter in AP_AHRS::groundspeed_vector
-	float _xlp; // x component low-pass filter
-	float _ylp; // y component low-pass filter
-	float _xhp; // x component high-pass filter
-	float _yhp; // y component high-pass filter
-    Vector2f _lastGndVelADS; // previous HPF input
-		
-	};
+    // acceleration due to gravity in m/s/s
+    static const float _gravity = 9.80665;
+
+};
 
 #include <AP_AHRS_DCM.h>
 #include <AP_AHRS_MPU6000.h>
 #include <AP_AHRS_HIL.h>
 
-#endif // __AP_AHRS_H__
+#endif // AP_AHRS_H

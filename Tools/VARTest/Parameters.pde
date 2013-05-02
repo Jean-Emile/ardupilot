@@ -139,18 +139,18 @@ static void load_parameters(void)
 	     g.format_version != Parameters::k_format_version) {
 
 		// erase all parameters
-		cliSerial->printf_P(PSTR("Firmware change (%u -> %u): erasing EEPROM...\n"),
+		Serial.printf_P(PSTR("Firmware change (%u -> %u): erasing EEPROM...\n"),
 						g.format_version.get(), Parameters::k_format_version);
 		AP_Param::erase_all();
 
 		// save the current format version
 		g.format_version.set_and_save(Parameters::k_format_version);
-		cliSerial->println_P(PSTR("done."));
+		Serial.println_P(PSTR("done."));
     } else {
-	    unsigned long before = hal.scheduler->micros();
+	    unsigned long before = micros();
 	    // Load all auto-loaded EEPROM variables
 	    AP_Param::load_all();
 
-	    cliSerial->printf_P(PSTR("load_all took %luus\n"), hal.scheduler->micros() - before);
+	    Serial.printf_P(PSTR("load_all took %luus\n"), micros() - before);
 	}
 }

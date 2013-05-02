@@ -1,33 +1,27 @@
 
+#include <FastSerial.h>
 #include <AP_Common.h>
 #include <AP_Math.h>
-#include <AP_Param.h>
-#include <AP_Progmem.h>
-
 #include <AP_Menu.h>
-#include <AP_HAL.h>
-#include <AP_HAL_AVR.h>
 
-const AP_HAL::HAL& hal = AP_HAL_BOARD_DRIVER;
+FastSerialPort0(Serial);
 
 int8_t
 menu_test(uint8_t argc, const Menu::arg *argv)
 {
     int i;
 
-    hal.console->printf("This is a test with %d arguments\n", argc);
+    Serial.printf("This is a test with %d arguments\n", argc);
     for (i = 1; i < argc; i++) {
-        hal.console->printf("%d: int %ld  float ", i, argv[i].i);
-        hal.console->println(argv[i].f, 6);    // gross
+        Serial.printf("%d: int %ld  float ", i, argv[i].i);
+        Serial.println(argv[i].f, 6);    // gross
     }
-    return 0;
 }
 
 int8_t
 menu_auto(uint8_t argc, const Menu::arg *argv)
 {
-    hal.console->println("auto text");
-    return 0;
+    Serial.println("auto text");
 }
 
 const struct Menu::command top_menu_commands[] PROGMEM = {
@@ -40,14 +34,12 @@ MENU(top, "menu", top_menu_commands);
 void
 setup(void)
 {
-    hal.console->println_P(PSTR("AP_Menu unit test"));
+    Serial.begin(38400);
     top.run();
 }
 
 void
 loop(void)
 {
-    hal.console->printf("not reached\n");
 }
 
-AP_HAL_MAIN();

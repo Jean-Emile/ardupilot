@@ -7,7 +7,6 @@ import optparse, fnmatch, time, glob, traceback, signal
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'pysim'))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', '..', 'mavlink', 'pymavlink'))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', '..', 'mavlink', 'pymavlink', 'generator'))
 import util
 
 os.environ['PYTHONUNBUFFERED'] = '1'
@@ -38,7 +37,7 @@ def get_default_params(atype):
 def dump_logs(atype):
     '''dump DataFlash logs'''
     print("Dumping logs for %s" % atype)
-    sil = util.start_SIL(atype)
+    sil = util.start_SIL(atype, CLI=True)
     logfile = util.reltopdir('../buildlogs/%s.flashlog' % atype)
     log = open(logfile, mode='w')
     mavproxy = util.start_MAVProxy_SIL(atype, setup=True, logfile=log)
@@ -54,7 +53,7 @@ def dump_logs(atype):
     else:
         numlogs = int(mavproxy.match.group(1))
     for i in range(numlogs):
-        mavproxy.expect("Log (\d+)")
+        mavproxy.expect("Log (\d+),")
         lognums.append(int(mavproxy.match.group(1)))
     mavproxy.expect("Log]")
     for i in range(numlogs):
@@ -77,20 +76,6 @@ def build_all():
         return False
     return True
 
-def build_binaries():
-    '''run the build_binaries.sh script'''
-    print("Running build_binaries.sh")
-    import shutil
-    # copy the script as it changes git branch, which can change the script while running
-    orig=util.reltopdir('Tools/scripts/build_binaries.sh')
-    copy=util.reltopdir('./build_binaries.sh')
-    shutil.copyfile(orig, copy)
-    shutil.copymode(orig, copy)
-    if util.run_cmd(copy, dir=util.reltopdir('.')) != 0:
-        print("Failed build_binaries.sh")
-        return False
-    return True
-
 def build_examples():
     '''run the build_examples.sh script'''
     print("Running build_examples.sh")
@@ -101,11 +86,11 @@ def build_examples():
 
 
 def convert_gpx():
-    '''convert any tlog files to GPX and KML'''
+    '''convert any mavlog files to GPX and KML'''
     import glob
-    mavlog = glob.glob(util.reltopdir("../buildlogs/*.tlog"))
+    mavlog = glob.glob(util.reltopdir("../buildlogs/*.mavlog"))
     for m in mavlog:
-        util.run_cmd(util.reltopdir("../mavlink/pymavlink/examples/mavtogpx.py") + " --nofixcheck " + m)
+        util.run_cmd(util.reltopdir("../pymavlink/examples/mavtogpx.py") + " --nofixcheck " + m)
         gpx = m + '.gpx'
         kml = m + '.kml'
         util.run_cmd('gpsbabel -i gpx -f %s -o kml,units=m,floating=1,extrude=1 -F %s' % (gpx, kml), checkfail=False)
@@ -129,7 +114,7 @@ def alarm_handler(signum, frame):
         results.addglob("Google Earth track", '*.kmz')
         results.addfile('Full Logs', 'autotest-output.txt')
         results.addglob('DataFlash Log', '*.flashlog')
-        results.addglob("MAVLink log", '*.tlog')
+        results.addglob("MAVLink log", '*.mavlog')
         results.addfile('ArduPlane build log', 'ArduPlane.txt')
         results.addfile('ArduPlane defaults', 'ArduPlane.defaults.txt')
         results.addfile('ArduCopter build log', 'ArduCopter.txt')
@@ -148,7 +133,7 @@ parser.add_option("--skip", type='string', default='', help='list of steps to sk
 parser.add_option("--list", action='store_true', default=False, help='list the available steps')
 parser.add_option("--viewerip", default=None, help='IP address to send MAVLink and fg packets to')
 parser.add_option("--experimental", default=False, action='store_true', help='enable experimental tests')
-parser.add_option("--timeout", default=3000, type='int', help='maximum runtime in seconds')
+parser.add_option("--timeout", default=2400, type='int', help='maximum runtime in seconds')
 
 opts, args = parser.parse_args()
 
@@ -157,7 +142,6 @@ import  arducopter, arduplane, apmrover2
 steps = [
     'prerequesites',
     'build.All',
-    'build.Binaries',
     'build.Examples',
 
     'build1280.ArduPlane',
@@ -188,11 +172,6 @@ skipsteps = opts.skip.split(',')
 # ensure we catch timeouts
 signal.signal(signal.SIGALRM, alarm_handler)
 signal.alarm(opts.timeout)
-
-if opts.list:
-    for step in steps:
-        print(step)
-    sys.exit(0)
 
 def skip_step(step):
     '''see if a step should be skipped'''
@@ -263,9 +242,6 @@ def run_step(step):
     if step == 'build.All':
         return build_all()
 
-    if step == 'build.Binaries':
-        return build_binaries()
-
     if step == 'build.Examples':
         return build_examples()
 
@@ -313,7 +289,7 @@ class TestResults(object):
 
 def write_webresults(results):
     '''write webpage results'''
-    sys.path.insert(0, os.path.join(util.reltopdir("../mavlink/pymavlink/generator")))
+    sys.path.insert(0, os.path.join(util.reltopdir("../pymavlink/generator")))
     import mavtemplate
     t = mavtemplate.MAVTemplate()
     for h in glob.glob(util.reltopdir('Tools/autotest/web/*.html')):
@@ -364,7 +340,7 @@ def run_tests(steps):
     results.addglob("Google Earth track", '*.kmz')
     results.addfile('Full Logs', 'autotest-output.txt')
     results.addglob('DataFlash Log', '*.flashlog')
-    results.addglob("MAVLink log", '*.tlog')
+    results.addglob("MAVLink log", '*.mavlog')
     results.addglob("GPX track", '*.gpx')
     results.addfile('ArduPlane build log', 'ArduPlane.txt')
     results.addfile('ArduPlane code size', 'ArduPlane.sizes.txt')
@@ -383,8 +359,6 @@ def run_tests(steps):
 
     return passed
 
-
-util.mkdir_p(util.reltopdir('../buildlogs'))
 
 lck = util.lock_file(util.reltopdir('../buildlogs/autotest.lck'))
 if lck is None:

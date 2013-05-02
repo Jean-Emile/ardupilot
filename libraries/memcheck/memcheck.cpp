@@ -5,9 +5,7 @@
  *  of false positives with uninitialised stack variables
  */
 
-#include <stdlib.h>
-#include <stdint.h>
-#include <AP_HAL_Boards.h>
+#include <AP_Common.h>
 
 static const uint32_t *stack_low;
 extern unsigned __brkval;
@@ -41,7 +39,7 @@ void memcheck_update_stackptr(void)
  */
 void memcheck_init(void)
 {
-#if CONFIG_HAL_BOARD == HAL_BOARD_APM1 || CONFIG_HAL_BOARD == HAL_BOARD_APM2
+#ifndef DESKTOP_BUILD
     uint32_t *p;
     free(malloc(1)); // ensure heap is initialised
     stack_low = current_stackptr();
@@ -58,13 +56,13 @@ void memcheck_init(void)
  */
 unsigned memcheck_available_memory(void)
 {
-#if CONFIG_HAL_BOARD == HAL_BOARD_APM1 || CONFIG_HAL_BOARD == HAL_BOARD_APM2
+#ifdef DESKTOP_BUILD
+    return 0x1000;
+#else
     memcheck_update_stackptr();
     while (*stack_low != SENTINEL && stack_low > (const uint32_t *)__brkval) {
         stack_low--;
     }
     return (uintptr_t)(stack_low) - __brkval;
-#else
-    return 0x1000;
 #endif
 }

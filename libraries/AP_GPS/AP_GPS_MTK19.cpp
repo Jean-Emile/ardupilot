@@ -10,18 +10,25 @@
 //
 //    GPS configuration : Custom protocol per "DIYDrones Custom Binary Sentence Specification V1.6, v1.7, v1.8, v1.9"
 //
-//   Note that this driver supports both the 1.6 and 1.9 protocol varients
-//
 
-#include <AP_HAL.h>
+#include <FastSerial.h>
 #include "AP_GPS_MTK19.h"
 #include <stdint.h>
+#if defined(ARDUINO) && ARDUINO >= 100
+ #include "Arduino.h"
+#else
+ #include <wiring.h>
+#endif
+
+// Constructors ////////////////////////////////////////////////////////////////
+AP_GPS_MTK19::AP_GPS_MTK19(Stream *s) : GPS(s)
+{
+}
 
 // Public Methods //////////////////////////////////////////////////////////////
 void
-AP_GPS_MTK19::init(AP_HAL::UARTDriver *s, enum GPS_Engine_Setting nav_setting)
+AP_GPS_MTK19::init(enum GPS_Engine_Setting nav_setting)
 {
-	_port = s;
     _port->flush();
 
     // initialize serial port for binary protocol use
@@ -44,6 +51,7 @@ AP_GPS_MTK19::init(AP_HAL::UARTDriver *s, enum GPS_Engine_Setting nav_setting)
     _epoch = TIME_OF_DAY;
     _time_offset = 0;
     _offset_calculated = false;
+    idleTimeout = 1200;
 }
 
 // Process bytes available from the stream
@@ -84,21 +92,29 @@ restart:
         //
         case 0:
             if (data == PREAMBLE1_V16) {
-                _mtk_revision     = MTK_GPS_REVISION_V16;
+                _mtk_type_step1     = MTK_GPS_REVISION_V16;
                 _step++;
-            } else if (data == PREAMBLE1_V19) {
-                _mtk_revision     = MTK_GPS_REVISION_V19;
+            }    
+            if (data == PREAMBLE1_V19) {
+                _mtk_type_step1     = MTK_GPS_REVISION_V19;
                 _step++;
             }    
             break;
         case 1:
-            if (data == PREAMBLE2) {
+            if ((_mtk_type_step1 == MTK_GPS_REVISION_V16) && (data == PREAMBLE2_V16)){
                 _step++;
-            } else {
-				_step = 0;
-				goto restart;
-			}
-			break;
+                _mtk_type_step2     = MTK_GPS_REVISION_V16;
+                break;
+            }
+            if ((_mtk_type_step1 == MTK_GPS_REVISION_V19) && (data == PREAMBLE2_V19)){
+                _step++;
+                _mtk_type_step2     = MTK_GPS_REVISION_V19;
+                break;
+            }
+            _mtk_type_step1         = 0;
+            _mtk_type_step2         = 0;
+            _step                   = 0;
+            //goto restart;
         case 2:
             if (sizeof(_buffer) == data) {
                 _step++;
@@ -106,7 +122,7 @@ restart:
                 _payload_counter    = 0;
             } else {
                 _step               = 0;                       // reset and wait for a message of the right class
-                goto restart;
+                //goto restart;
             }
             break;
 
@@ -115,9 +131,8 @@ restart:
         case 3:
             _buffer.bytes[_payload_counter++] = data;
             _ck_b += (_ck_a += data);
-            if (_payload_counter == sizeof(_buffer)) {
+            if (_payload_counter == sizeof(_buffer))
                 _step++;
-			}
             break;
 
         // Checksum and message processing
@@ -126,31 +141,22 @@ restart:
             _step++;
             if (_ck_a != data) {
                 _step               = 0;
-				goto restart;
             }
             break;
         case 5:
             _step                   = 0;
             if (_ck_b != data) {
-				goto restart;
+                break;
             }
 
-            // parse fix
-            if (_buffer.msg.fix_type == FIX_3D || _buffer.msg.fix_type == FIX_3D_SBAS) {
-                fix = GPS::FIX_3D;
-            }else if (_buffer.msg.fix_type == FIX_2D || _buffer.msg.fix_type == FIX_2D_SBAS) {
-                fix = GPS::FIX_2D;
-            }else{
-                fix = GPS::FIX_NONE;
-            }
-
-            if (_mtk_revision == MTK_GPS_REVISION_V16) {
+            fix                     = ((_buffer.msg.fix_type == FIX_3D) ||
+                                       (_buffer.msg.fix_type == FIX_3D_SBAS));                   
+            latitude                = _buffer.msg.latitude;
+            longitude               = _buffer.msg.longitude;
+            if    (_mtk_type_step2 == MTK_GPS_REVISION_V16){
                 latitude            = _buffer.msg.latitude  * 10;  // V16, V17,V18 doc says *10e7 but device says otherwise
                 longitude           = _buffer.msg.longitude * 10;  // V16, V17,V18 doc says *10e7 but device says otherwise
-            } else {
-				latitude            = _buffer.msg.latitude;
-				longitude           = _buffer.msg.longitude;
-			}
+            }
             altitude                = _buffer.msg.altitude;
             ground_speed            = _buffer.msg.ground_speed;
             ground_course           = _buffer.msg.ground_course;
@@ -176,6 +182,20 @@ restart:
                 altitude            = 584;
             }
 #endif
+
+            /*    Waiting on clarification of MAVLink protocol!
+             *  if(!_offset_calculated && parsed) {
+             *                   int32_t tempd1 = date;
+             *                   int32_t day    = tempd1/10000;
+             *   tempd1         -= day * 10000;
+             *                   int32_t month    = tempd1/100;
+             *                   int32_t year    = tempd1 - month * 100;
+             *   _time_offset = _calc_epoch_offset(day, month, year);
+             *   _epoch = UNIX_EPOCH;
+             *   _offset_calculated = TRUE;
+             *  }
+             */
+
         }
     }
     return parsed;
@@ -190,31 +210,41 @@ AP_GPS_MTK19::_detect(uint8_t data)
 {
     static uint8_t payload_counter;
     static uint8_t step;
+    static uint8_t mtk_type_step1, mtk_type_step2;
     static uint8_t ck_a, ck_b;
 
-restart:
 	switch (step) {
         case 0:
             ck_b = ck_a = payload_counter = 0;
-            if (data == PREAMBLE1_V16 || data == PREAMBLE1_V19) {
+            if (data == PREAMBLE1_V16) {
+                mtk_type_step1      = MTK_GPS_REVISION_V16;
+                step++;
+            }    
+            if (data == PREAMBLE1_V19) {
+                mtk_type_step1      = MTK_GPS_REVISION_V19;
                 step++;
             }    
             break;
         case 1:
-            if (PREAMBLE2 == data) {
+            if ((mtk_type_step1 == MTK_GPS_REVISION_V16) && (PREAMBLE2_V16 == data)){
                 step++;
-            } else {
-				step = 0;
-				goto restart;
-			}
-			break;
+                mtk_type_step2      = MTK_GPS_REVISION_V16;
+                break;
+            }
+            if ((mtk_type_step1 == MTK_GPS_REVISION_V19) && (PREAMBLE2_V19 == data)){
+                step++;
+                mtk_type_step2      = MTK_GPS_REVISION_V19;
+                break;
+            }
+            mtk_type_step1          = 0;
+            mtk_type_step2          = 0;
+            step                    = 0;
         case 2:
             if (data == sizeof(struct diyd_mtk_msg)) {
                 step++;
                 ck_b = ck_a         = data;
             } else {
                 step                = 0;
-				goto restart;
             }
             break;
         case 3:
@@ -225,16 +255,17 @@ restart:
         case 4:
             step++;
             if (ck_a != data) {
-                step 				= 0;
-				goto restart;
+                Serial.print_P(PSTR("wrong ck_a\n"));
+                step                = 0;
             }
             break;
         case 5:
             step                    = 0;
-            if (ck_b != data) {
-				goto restart;
-			}
-			return true;
-	}
+            if (ck_b == data) {
+                return true;
+            }
+            Serial.print_P(PSTR("wrong ck_b\n"));
+            break;
+    }
     return false;
 }

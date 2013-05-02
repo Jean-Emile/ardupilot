@@ -1,2 +1,2 @@
 BOARD	=	mega2560
-include ../../../../mk/apm.mk
+include ../../../AP_Common/Arduino.mk

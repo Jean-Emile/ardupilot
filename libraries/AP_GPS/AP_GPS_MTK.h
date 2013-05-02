@@ -12,26 +12,21 @@
 //
 // Note - see AP_GPS_MTK16.h for firmware 1.6 and later.
 //
-#ifndef __AP_GPS_MTK_H__
-#define __AP_GPS_MTK_H__
+#ifndef AP_GPS_MTK_h
+#define AP_GPS_MTK_h
 
 #include "GPS.h"
 #include "AP_GPS_MTK_Common.h"
 
 class AP_GPS_MTK : public GPS {
 public:
-    AP_GPS_MTK() :
-		GPS(),
-		_step(0),
-		_payload_counter(0)
-		{}
-
-    virtual void        init(AP_HAL::UARTDriver *s, enum GPS_Engine_Setting nav_setting = GPS_ENGINE_NONE);
+    AP_GPS_MTK(Stream *s);
+    virtual void        init(enum GPS_Engine_Setting nav_setting = GPS_ENGINE_NONE);
     virtual bool        read(void);
     static bool _detect(uint8_t );
 
 private:
-    #pragma pack(push,1)
+// XXX this is being ignored by the compiler #pragma pack(1)
     struct diyd_mtk_msg {
         int32_t latitude;
         int32_t longitude;
@@ -42,7 +37,7 @@ private:
         uint8_t fix_type;
         uint32_t utc_time;
     };
-    #pragma pack(pop)
+// #pragma pack(pop)
     enum diyd_mtk_fix_type {
         FIX_NONE = 1,
         FIX_2D = 2,
@@ -74,4 +69,4 @@ private:
     void        _parse_gps();
 };
 
-#endif  // __AP_GPS_MTK_H__
+#endif  // AP_GPS_MTK_H

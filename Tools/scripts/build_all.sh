@@ -8,19 +8,19 @@ set -x
 
 echo "Testing ArduPlane build"
 pushd ArduPlane
-for b in all apm2 apm2beta apm1-hil apm1-hilsensors apm2-hil apm2-hilsensors sitl sitl-mount sitl-newcontrollers; do
+for b in all apm2 apm2beta hil hilsensors hil-apm2 hilsensors-apm2 sitl sitl-mount sitl-newcontrollers; do
     pwd
     make clean
-    make $b -j4
+    make $b
 done
 popd
 
 echo "Testing ArduCopter build"
 pushd ArduCopter
-for b in all apm2 apm1-hil apm2-hil sitl heli dmp; do
+for b in all apm2 apm2beta hil sitl heli dmp; do
     pwd
     make clean
-    make $b -j4
+    make $b
 done
 popd
 
@@ -29,7 +29,7 @@ pushd APMrover2
 for b in all apm2 sitl; do
     pwd
     make clean
-    make $b -j4
+    make $b
 done
 popd
 
@@ -39,13 +39,8 @@ examples="Tools/VARTest Tools/CPUInfo"
 for d in $examples; do
     pushd $d
     make clean
-    make -j4
+    make
     popd
 done
-
-. config.mk
-test -n "$PX4_ROOT" && test -d "$PX4_ROOT" && {
-    ./Tools/scripts/build_all_px4.sh
-}
 
 exit 0

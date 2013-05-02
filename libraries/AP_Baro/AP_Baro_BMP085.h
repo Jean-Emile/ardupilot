@@ -10,15 +10,15 @@
 class AP_Baro_BMP085 : public AP_Baro
 {
 public:
-    AP_Baro_BMP085() {
+    AP_Baro_BMP085(bool apm2_hardware) :
+        _apm2_hardware(apm2_hardware) {
         _pressure_samples = 1;
     };       // Constructor
 
 
     /* AP_Baro public interface: */
-    bool            init();
+    bool            init(AP_PeriodicProcess * scheduler);
     uint8_t         read();
-    void 			accumulate(void);
     float           get_pressure();
     float           get_temperature();
 
@@ -28,12 +28,11 @@ public:
 private:
     int32_t         RawPress;
     int32_t         RawTemp;
-    float		    _temp_sum;
-    float			_press_sum;
-    uint8_t			_count;
-    float           Temp;
-    float           Press;
-    
+    int16_t         Temp;
+    uint32_t        Press;
+    bool            _apm2_hardware;
+
+
     // State machine
     uint8_t                         BMP085_State;
     // Internal calibration registers

@@ -3,29 +3,28 @@
 #if CLI_ENABLED == ENABLED
 
 // Functions called from the setup menu
-static int8_t   setup_radio             (uint8_t argc, const Menu::arg *argv);
-static int8_t   setup_motors            (uint8_t argc, const Menu::arg *argv);
-static int8_t   setup_accel             (uint8_t argc, const Menu::arg *argv);
-static int8_t   setup_accel_scale       (uint8_t argc, const Menu::arg *argv);
-static int8_t   setup_frame             (uint8_t argc, const Menu::arg *argv);
-static int8_t   setup_factory           (uint8_t argc, const Menu::arg *argv);
-static int8_t   setup_erase             (uint8_t argc, const Menu::arg *argv);
-static int8_t   setup_flightmodes       (uint8_t argc, const Menu::arg *argv);
-static int8_t   setup_batt_monitor      (uint8_t argc, const Menu::arg *argv);
-static int8_t   setup_sonar             (uint8_t argc, const Menu::arg *argv);
-static int8_t   setup_compass           (uint8_t argc, const Menu::arg *argv);
-static int8_t   setup_compassmot        (uint8_t argc, const Menu::arg *argv);
-static int8_t   setup_tune              (uint8_t argc, const Menu::arg *argv);
-static int8_t   setup_range             (uint8_t argc, const Menu::arg *argv);
-static int8_t   setup_declination       (uint8_t argc, const Menu::arg *argv);
-static int8_t   setup_optflow           (uint8_t argc, const Menu::arg *argv);
+static int8_t   setup_radio                             (uint8_t argc, const Menu::arg *argv);
+static int8_t   setup_motors                    (uint8_t argc, const Menu::arg *argv);
+static int8_t   setup_accel                             (uint8_t argc, const Menu::arg *argv);
+static int8_t   setup_accel_scale               (uint8_t argc, const Menu::arg *argv);
+static int8_t   setup_frame                             (uint8_t argc, const Menu::arg *argv);
+static int8_t   setup_factory                   (uint8_t argc, const Menu::arg *argv);
+static int8_t   setup_erase                             (uint8_t argc, const Menu::arg *argv);
+static int8_t   setup_flightmodes               (uint8_t argc, const Menu::arg *argv);
+static int8_t   setup_batt_monitor              (uint8_t argc, const Menu::arg *argv);
+static int8_t   setup_sonar                             (uint8_t argc, const Menu::arg *argv);
+static int8_t   setup_compass                   (uint8_t argc, const Menu::arg *argv);
+static int8_t   setup_tune                              (uint8_t argc, const Menu::arg *argv);
+static int8_t   setup_range                             (uint8_t argc, const Menu::arg *argv);
+//static int8_t	setup_mag_offset		(uint8_t argc, const Menu::arg *argv);
+static int8_t   setup_declination               (uint8_t argc, const Menu::arg *argv);
+static int8_t   setup_optflow                   (uint8_t argc, const Menu::arg *argv);
+
 
  #if FRAME_CONFIG == HELI_FRAME
-static int8_t   setup_heli              (uint8_t argc, const Menu::arg *argv);
-static int8_t   setup_gyro              (uint8_t argc, const Menu::arg *argv);
+static int8_t   setup_heli                              (uint8_t argc, const Menu::arg *argv);
+static int8_t   setup_gyro                              (uint8_t argc, const Menu::arg *argv);
  #endif
-
-static int8_t   setup_set               (uint8_t argc, const Menu::arg *argv);
 
 // Command/function table for the setup menu
 const struct Menu::command setup_menu_commands[] PROGMEM = {
@@ -42,17 +41,16 @@ const struct Menu::command setup_menu_commands[] PROGMEM = {
     {"battery",                     setup_batt_monitor},
     {"sonar",                       setup_sonar},
     {"compass",                     setup_compass},
-    {"compassmot",                  setup_compassmot},
     {"tune",                        setup_tune},
     {"range",                       setup_range},
+//	{"offsets",			setup_mag_offset},
     {"declination",         setup_declination},
     {"optflow",                     setup_optflow},
  #if FRAME_CONFIG == HELI_FRAME
     {"heli",                        setup_heli},
     {"gyro",                        setup_gyro},
  #endif
-    {"show",                        setup_show},
-    {"set",                         setup_set}
+    {"show",                        setup_show}
 };
 
 // Create the setup menu object.
@@ -64,6 +62,11 @@ setup_mode(uint8_t argc, const Menu::arg *argv)
 {
     // Give the user some guidance
     cliSerial->printf_P(PSTR("Setup Mode\n\n\n"));
+    //"\n"
+    //"IMPORTANT: if you have not previously set this system up, use the\n"
+    //"'reset' command to initialize the EEPROM to sensible default values\n"
+    //"and then the 'radio' command to configure for your radio.\n"
+    //"\n"));
 
     if(g.rc_1.radio_min >= 1300) {
         delay(1000);
@@ -82,24 +85,6 @@ setup_mode(uint8_t argc, const Menu::arg *argv)
 static int8_t
 setup_show(uint8_t argc, const Menu::arg *argv)
 {
-    AP_Param *param;
-    ap_var_type type;
-
-    //If a parameter name is given as an argument to show, print only that parameter
-    if(argc>=2)
-    {
-
-        param=AP_Param::find(argv[1].str, &type);
-
-        if(!param)
-        {
-            cliSerial->printf_P(PSTR("Parameter not found: '%s'\n"), argv[1]);
-            return 0;
-        }
-        AP_Param::show(param, argv[1].str, type, cliSerial);
-        return 0;
-    }
-
     // clear the area
     print_blanks(8);
 
@@ -108,6 +93,9 @@ setup_show(uint8_t argc, const Menu::arg *argv)
     report_frame();
     report_batt_monitor();
     report_sonar();
+    //report_gains();
+    //report_xtrack();
+    //report_throttle();
     report_flight_modes();
     report_ins();
     report_compass();
@@ -118,7 +106,7 @@ setup_show(uint8_t argc, const Menu::arg *argv)
     report_gyro();
  #endif
 
-    AP_Param::show_all(cliSerial);
+    AP_Param::show_all();
 
     return(0);
 }
@@ -143,6 +131,7 @@ setup_factory(uint8_t argc, const Menu::arg *argv)
     cliSerial->printf_P(PSTR("\nReboot APM"));
 
     delay(1000);
+    //default_gains();
 
     for (;; ) {
     }
@@ -218,7 +207,7 @@ setup_radio(uint8_t argc, const Menu::arg *argv)
 
         if(cliSerial->available() > 0) {
             delay(20);
-            while (cliSerial->read() != -1); /* flush */
+            cliSerial->flush();
 
             g.rc_1.save_eeprom();
             g.rc_2.save_eeprom();
@@ -241,11 +230,8 @@ static int8_t
 setup_motors(uint8_t argc, const Menu::arg *argv)
 {
     cliSerial->printf_P(PSTR(
-                        "Connect battery for this test.\n"
-                        "Motors will not spin in channel order (1,2,3,4) but by frame position order.\n"
-                        "Front (& right of centerline) motor first, then in clockwise order around frame.\n"
-                        "http://code.google.com/p/arducopter/wiki/AC2_Props_2 for demo video.\n"
-                        "Remember to disconnect battery after this test.\n"
+                        "Now connect the main lipo and follow the instruction on the wiki for your frame setup.\n"
+                        "For security remember to disconnect the main lipo after the test, then hit any key to exit.\n"
                         "Any key to exit.\n"));
     while(1) {
         delay(20);
@@ -261,15 +247,39 @@ setup_motors(uint8_t argc, const Menu::arg *argv)
 static int8_t
 setup_accel(uint8_t argc, const Menu::arg *argv)
 {
-    ahrs.init();
     ins.init(AP_InertialSensor::COLD_START, 
              ins_sample_rate,
-             flash_leds);
-    ins.init_accel(flash_leds);
+             delay, flash_leds, &timer_scheduler);
+    ins.init_accel(delay, flash_leds);  // level accelerometer values
     ahrs.set_trim(Vector3f(0,0,0));     // clear out saved trim
     report_ins();
     return(0);
 }
+
+/*
+  handle full accelerometer calibration via user dialog
+ */
+
+static void setup_printf_P(const prog_char_t *fmt, ...)
+{
+    va_list arg_list;
+    va_start(arg_list, fmt);
+    cliSerial->vprintf_P(fmt, arg_list);
+    va_end(arg_list);
+}
+
+static void setup_wait_key(void)
+{
+    // wait for user input
+    while (!cliSerial->available()) {
+        delay(20);
+    }
+    // clear input buffer
+    while( cliSerial->available() ) {
+        cliSerial->read();
+    }
+}
+
 
 static int8_t
 setup_accel_scale(uint8_t argc, const Menu::arg *argv)
@@ -277,15 +287,14 @@ setup_accel_scale(uint8_t argc, const Menu::arg *argv)
     float trim_roll, trim_pitch;
 
     cliSerial->println_P(PSTR("Initialising gyros"));
-    ahrs.init();
     ins.init(AP_InertialSensor::COLD_START, 
              ins_sample_rate,
-             flash_leds);
-    AP_InertialSensor_UserInteractStream interact(hal.console);
-    if(ins.calibrate_accel(flash_leds, &interact, trim_roll, trim_pitch)) {
-        // reset ahrs's trim to suggested values from calibration routine
-        ahrs.set_trim(Vector3f(trim_roll, trim_pitch, 0));
-    }
+             delay, flash_leds, &timer_scheduler);
+    ins.calibrate_accel(delay, flash_leds, setup_printf_P, setup_wait_key, trim_roll, trim_pitch);
+    // reset ahrs's trim to suggested values from calibration routine
+    trim_roll = constrain(trim_roll, ToRad(-10.0f), ToRad(10.0f));
+    trim_pitch = constrain(trim_pitch, ToRad(-10.0f), ToRad(10.0f));
+    ahrs.set_trim(Vector3f(trim_roll, trim_pitch, 0));
     report_ins();
     return(0);
 }
@@ -314,8 +323,8 @@ setup_frame(uint8_t argc, const Menu::arg *argv)
 static int8_t
 setup_flightmodes(uint8_t argc, const Menu::arg *argv)
 {
-    uint8_t _switchPosition = 0;
-    uint8_t _oldSwitchPosition = 0;
+    byte _switchPosition = 0;
+    byte _oldSwitchPosition = 0;
     int8_t mode = 0;
 
     cliSerial->printf_P(PSTR("\nMode switch to edit, aileron: select modes, rudder: Simple on/off\n"));
@@ -331,10 +340,10 @@ setup_flightmodes(uint8_t argc, const Menu::arg *argv)
         if (_oldSwitchPosition != _switchPosition) {
 
             mode = flight_modes[_switchPosition];
-            mode = constrain_int16(mode, 0, NUM_MODES-1);
+            mode = constrain(mode, 0, NUM_MODES-1);
 
             // update the user
-            print_switch(_switchPosition, mode, BIT_IS_SET(g.simple_modes, _switchPosition));
+            print_switch(_switchPosition, mode, (g.simple_modes & (1<<_switchPosition)));
 
             // Remember switch position
             _oldSwitchPosition = _switchPosition;
@@ -350,7 +359,7 @@ setup_flightmodes(uint8_t argc, const Menu::arg *argv)
             flight_modes[_switchPosition] = mode;
 
             // print new mode
-            print_switch(_switchPosition, mode, BIT_IS_SET(g.simple_modes, _switchPosition));
+            print_switch(_switchPosition, mode, (g.simple_modes & (1<<_switchPosition)));
             delay(500);
         }
 
@@ -358,7 +367,7 @@ setup_flightmodes(uint8_t argc, const Menu::arg *argv)
         if (g.rc_4.control_in > 3000) {
             g.simple_modes |= (1<<_switchPosition);
             // print new mode
-            print_switch(_switchPosition, mode, BIT_IS_SET(g.simple_modes, _switchPosition));
+            print_switch(_switchPosition, mode, (g.simple_modes & (1<<_switchPosition)));
             delay(500);
         }
 
@@ -366,7 +375,7 @@ setup_flightmodes(uint8_t argc, const Menu::arg *argv)
         if (g.rc_4.control_in < -3000) {
             g.simple_modes &= ~(1<<_switchPosition);
             // print new mode
-            print_switch(_switchPosition, mode, BIT_IS_SET(g.simple_modes, _switchPosition));
+            print_switch(_switchPosition, mode, (g.simple_modes & (1<<_switchPosition)));
             delay(500);
         }
 
@@ -395,6 +404,8 @@ static int8_t
 setup_tune(uint8_t argc, const Menu::arg *argv)
 {
     g.radio_tuning.set_and_save(argv[1].i);
+    //g.radio_tuning_high.set_and_save(1000);
+    //g.radio_tuning_low.set_and_save(0);
     report_tuning();
     return 0;
 }
@@ -438,219 +449,6 @@ setup_compass(uint8_t argc, const Menu::arg *argv)
 
     g.compass_enabled.save();
     report_compass();
-    return 0;
-}
-
-// setup_compassmot - sets compass's motor interference parameters
-static int8_t
-setup_compassmot(uint8_t argc, const Menu::arg *argv)
-{
-    int8_t   comp_type;             // throttle or current based compensation
-    Vector3f compass_base;          // compass vector when throttle is zero
-    Vector3f motor_impact;          // impact of motors on compass vector
-    Vector3f motor_impact_scaled;   // impact of motors on compass vector scaled with throttle
-    Vector3f motor_compensation;    // final compensation to be stored to eeprom
-    float    throttle_pct;          // throttle as a percentage 0.0 ~ 1.0
-    uint32_t last_run_time;
-    uint8_t  print_counter = 49;
-    bool     updated = false;       // have we updated the compensation vector at least once
-
-    // default compensation type to use current if possible
-    if( g.battery_monitoring == BATT_MONITOR_VOLTAGE_AND_CURRENT ) {
-        comp_type = AP_COMPASS_MOT_COMP_CURRENT;
-    }else{
-        comp_type = AP_COMPASS_MOT_COMP_THROTTLE;
-    }
-
-    // check if user wants throttle compensation
-    if( !strcmp_P(argv[1].str, PSTR("t")) || !strcmp_P(argv[1].str, PSTR("T")) ) {
-        comp_type = AP_COMPASS_MOT_COMP_THROTTLE;
-    }
-
-    // check if user wants current compensation
-    if( !strcmp_P(argv[1].str, PSTR("c")) || !strcmp_P(argv[1].str, PSTR("C")) ) {
-        comp_type = AP_COMPASS_MOT_COMP_CURRENT;
-    }
-
-    // check compass is enabled
-    if( !g.compass_enabled ) {
-        cliSerial->print_P(PSTR("compass disabled, exiting"));
-        return 0;
-    }
-
-    // check if we have a current monitor
-    if( comp_type == AP_COMPASS_MOT_COMP_CURRENT && g.battery_monitoring != BATT_MONITOR_VOLTAGE_AND_CURRENT ) {
-        cliSerial->print_P(PSTR("current monitor disabled, exiting"));
-        return 0;
-    }
-
-    // initialise compass
-    init_compass();
-
-    // disable motor compensation
-    compass.motor_compensation_type(AP_COMPASS_MOT_COMP_DISABLED);
-    compass.set_motor_compensation(Vector3f(0,0,0));
-
-    // print warning that motors will spin
-    // ask user to raise throttle
-    // inform how to stop test
-    cliSerial->print_P(PSTR("This setup records the impact on the compass of spinning up the motors.  The motors will spin!\nHold throttle low, then raise as high as safely possible for 10 sec.\nAt any time you may press any key to exit.\nmeasuring compass vs "));
-
-    // inform what type of compensation we are attempting
-    if( comp_type == AP_COMPASS_MOT_COMP_CURRENT ) {
-        cliSerial->print_P(PSTR("CURRENT\n"));
-    }else{
-        cliSerial->print_P(PSTR("THROTTLE\n"));
-    }
-
-    // clear out user input
-    while( cliSerial->available() ) {
-        cliSerial->read();
-    }
-
-    // disable throttle and battery failsafe
-    g.failsafe_throttle = FS_THR_DISABLED;
-    g.failsafe_battery_enabled = false;
-
-    // read radio
-    read_radio();
-
-    // exit immediately if throttle is not zero
-    if( g.rc_3.control_in != 0 ) {
-        cliSerial->print_P(PSTR("throttle not zero, exiting"));
-        return 0;
-    }
-
-    // get some initial compass readings
-    last_run_time = millis();
-    while( millis() - last_run_time < 2000 ) {
-        compass.accumulate();
-    }
-    compass.read();
-
-    // exit immediately if the compass is not healthy
-    if( !compass.healthy ) {
-        cliSerial->print_P(PSTR("compass not healthy, exiting"));
-        return 0;
-    }
-
-    // store initial x,y,z compass values
-    compass_base.x = compass.mag_x;
-    compass_base.y = compass.mag_y;
-    compass_base.z = compass.mag_z;
-
-    // initialise motor compensation
-    motor_compensation = Vector3f(0,0,0);
-
-    // clear out any user input
-    while( cliSerial->available() ) {
-        cliSerial->read();
-    }
-
-    // enable motors and pass through throttle
-    motors.enable();
-    motors.armed(true);
-    motors.output_min();
-
-    // initialise run time
-    last_run_time = millis();
-
-    // main run while there is no user input and the compass is healthy
-    while(!cliSerial->available() && compass.healthy) {
-
-        // 50hz loop
-        if( millis() - last_run_time > 20 ) {
-            last_run_time = millis();
-
-            // read radio input
-            read_radio();
-
-            // pass through throttle to motors
-            motors.throttle_pass_through();
-
-            // read some compass values
-            compass.read();
-
-            // read current
-            read_battery();
-
-            // calculate scaling for throttle
-            throttle_pct = (float)g.rc_3.control_in / 1000.0f;
-            throttle_pct = constrain(throttle_pct,0.0f,1.0f);
-
-            // if throttle is zero, update base x,y,z values
-            if( throttle_pct == 0.0f ) {
-                compass_base.x = compass_base.x * 0.99f + (float)compass.mag_x * 0.01f;
-                compass_base.y = compass_base.y * 0.99f + (float)compass.mag_y * 0.01f;
-                compass_base.z = compass_base.z * 0.99f + (float)compass.mag_z * 0.01f;
-
-                // causing printing to happen as soon as throttle is lifted
-                print_counter = 49;
-            }else{
-
-                // calculate diff from compass base and scale with throttle
-                motor_impact.x = compass.mag_x - compass_base.x;
-                motor_impact.y = compass.mag_y - compass_base.y;
-                motor_impact.z = compass.mag_z - compass_base.z;
-
-                // throttle based compensation
-                if( comp_type == AP_COMPASS_MOT_COMP_THROTTLE ) {
-                    // scale by throttle
-                    motor_impact_scaled = motor_impact / throttle_pct;
-
-                    // adjust the motor compensation to negate the impact
-                    motor_compensation = motor_compensation * 0.99f - motor_impact_scaled * 0.01f;
-                    updated = true;
-                }else{
-                    // current based compensation if more than 3amps being drawn
-                    motor_impact_scaled = motor_impact / current_amps1;
-
-                    // adjust the motor compensation to negate the impact if drawing over 3amps
-                    if( current_amps1 >= 3.0f ) {
-                        motor_compensation = motor_compensation * 0.99f - motor_impact_scaled * 0.01f;
-                        updated = true;
-                    }
-                }
-
-                // display output at 1hz if throttle is above zero
-                print_counter++;
-                if(print_counter >= 50) {
-                    print_counter = 0;
-                    cliSerial->printf_P(PSTR("thr:%d cur:%4.2f mot x:%4.1f y:%4.1f z:%4.1f  comp x:%4.2f y:%4.2f z:%4.2f\n"),(int)g.rc_3.control_in, (float)current_amps1, (float)motor_impact.x, (float)motor_impact.y, (float)motor_impact.z, (float)motor_compensation.x, (float)motor_compensation.y, (float)motor_compensation.z);
-                }
-            }
-        }else{
-            // grab some compass values
-            compass.accumulate();
-        }
-    }
-
-    // stop motors
-    motors.output_min();
-    motors.armed(false);
-
-    // clear out any user input
-    while( cliSerial->available() ) {
-        cliSerial->read();
-    }
-
-    // print one more time so the last thing printed matches what appears in the report_compass
-    cliSerial->printf_P(PSTR("thr:%d cur:%4.2f mot x:%4.1f y:%4.1f z:%4.1f  comp x:%4.2f y:%4.2f z:%4.2f\n"),(int)g.rc_3.control_in, (float)current_amps1, (float)motor_impact.x, (float)motor_impact.y, (float)motor_impact.z, (float)motor_compensation.x, (float)motor_compensation.y, (float)motor_compensation.z);
-
-    // set and save motor compensation
-    if( updated ) {
-        compass.motor_compensation_type(comp_type);
-        compass.set_motor_compensation(motor_compensation);
-        compass.save_motor_compensation();
-    }else{
-        // compensation vector never updated, report failure
-        cliSerial->printf_P(PSTR("Failed! Compensation disabled.  Did you forget to raise the throttle high enough?"));
-        compass.motor_compensation_type(AP_COMPASS_MOT_COMP_DISABLED);
-    }
-
-    // display new motor offsets and save
-    report_compass();
-
     return 0;
 }
 
@@ -973,64 +771,7 @@ setup_optflow(uint8_t argc, const Menu::arg *argv)
     return 0;
 }
 
-//Set a parameter to a specified value. It will cast the value to the current type of the
-//parameter and make sure it fits in case of INT8 and INT16
-static int8_t setup_set(uint8_t argc, const Menu::arg *argv)
-{
-    int8_t value_int8;
-    int16_t value_int16;
 
-    AP_Param *param;
-    enum ap_var_type p_type;
-
-    if(argc!=3)
-    {
-        cliSerial->printf_P(PSTR("Invalid command. Usage: set <name> <value>\n"));
-        return 0;
-    }
-
-    param = AP_Param::find(argv[1].str, &p_type);
-    if(!param)
-    {
-        cliSerial->printf_P(PSTR("Param not found: %s\n"), argv[1].str);
-        return 0;
-    }
-
-    switch(p_type)
-    {
-        case AP_PARAM_INT8:
-            value_int8 = (int8_t)(argv[2].i);
-            if(argv[2].i!=value_int8)
-            {
-                cliSerial->printf_P(PSTR("Value out of range for type INT8\n"));
-                return 0;
-            }
-            ((AP_Int8*)param)->set_and_save(value_int8);
-            break;
-        case AP_PARAM_INT16:
-            value_int16 = (int16_t)(argv[2].i);
-            if(argv[2].i!=value_int16)
-            {
-                cliSerial->printf_P(PSTR("Value out of range for type INT16\n"));
-                return 0;
-            }
-            ((AP_Int16*)param)->set_and_save(value_int16);
-            break;
-
-        //int32 and float don't need bounds checking, just use the value provoded by Menu::arg
-        case AP_PARAM_INT32:
-            ((AP_Int32*)param)->set_and_save(argv[2].i);
-            break;
-        case AP_PARAM_FLOAT:
-            ((AP_Float*)param)->set_and_save(argv[2].f);
-            break;
-        default:
-            cliSerial->printf_P(PSTR("Cannot set parameter of type %d.\n"), p_type);
-            break;
-    }
-
-    return 0;
-}
 
 /***************************************************************************/
 // CLI reports
@@ -1040,16 +781,16 @@ static void report_batt_monitor()
 {
     cliSerial->printf_P(PSTR("\nBatt Mon:\n"));
     print_divider();
-    if(g.battery_monitoring == BATT_MONITOR_DISABLED) print_enabled(false);
-    if(g.battery_monitoring == BATT_MONITOR_VOLTAGE_ONLY) cliSerial->printf_P(PSTR("volts"));
-    if(g.battery_monitoring == BATT_MONITOR_VOLTAGE_AND_CURRENT) cliSerial->printf_P(PSTR("volts and cur"));
+    if(g.battery_monitoring == 0) print_enabled(false);
+    if(g.battery_monitoring == 3) cliSerial->printf_P(PSTR("volts"));
+    if(g.battery_monitoring == 4) cliSerial->printf_P(PSTR("volts and cur"));
     print_blanks(2);
 }
 
-static void report_wp(uint8_t index = 255)
+static void report_wp(byte index = 255)
 {
     if(index == 255) {
-        for(uint8_t i = 0; i < g.command_total; i++) {
+        for(byte i = 0; i < g.command_total; i++) {
             struct Location temp = get_cmd_with_index(i);
             print_wp(&temp, i);
         }
@@ -1132,29 +873,11 @@ static void report_compass()
     Vector3f offsets = compass.get_offsets();
 
     // mag offsets
-    cliSerial->printf_P(PSTR("Mag off: %4.4f, %4.4f, %4.4f\n"),
+    cliSerial->printf_P(PSTR("Mag off: %4.4f, %4.4f, %4.4f"),
                     offsets.x,
                     offsets.y,
                     offsets.z);
-
-    // motor compensation
-    cliSerial->print_P(PSTR("Motor Comp: "));
-    if( compass.motor_compensation_type() == AP_COMPASS_MOT_COMP_DISABLED ) {
-        cliSerial->print_P(PSTR("Off\n"));
-    }else{
-        if( compass.motor_compensation_type() == AP_COMPASS_MOT_COMP_THROTTLE ) {
-            cliSerial->print_P(PSTR("Throttle"));
-        }
-        if( compass.motor_compensation_type() == AP_COMPASS_MOT_COMP_CURRENT ) {
-            cliSerial->print_P(PSTR("Current"));
-        }
-        Vector3f motor_compensation = compass.get_motor_compensation();
-        cliSerial->printf_P(PSTR("\nComp Vec: %4.2f, %4.2f, %4.2f\n"),
-                        motor_compensation.x,
-                        motor_compensation.y,
-                        motor_compensation.z);
-    }
-    print_blanks(1);
+    print_blanks(2);
 }
 
 static void report_flight_modes()
@@ -1163,7 +886,7 @@ static void report_flight_modes()
     print_divider();
 
     for(int16_t i = 0; i < 6; i++ ) {
-        print_switch(i, flight_modes[i], BIT_IS_SET(g.simple_modes, i));
+        print_switch(i, flight_modes[i], (g.simple_modes & (1<<i)));
     }
     print_blanks(2);
 }
@@ -1175,6 +898,10 @@ void report_optflow()
     print_divider();
 
     print_enabled(g.optflow_enabled);
+
+    // field of view
+    //cliSerial->printf_P(PSTR("FOV: %4.0f\n"),
+    //						degrees(g.optflow_fov));
 
     print_blanks(2);
  #endif     // OPTFLOW == ENABLED
@@ -1246,10 +973,10 @@ print_radio_values()
 }
 
 static void
-print_switch(uint8_t p, uint8_t m, bool b)
+print_switch(byte p, byte m, bool b)
 {
     cliSerial->printf_P(PSTR("Pos %d:\t"),p);
-    print_flight_mode(cliSerial, m);
+    print_flight_mode(m);
     cliSerial->printf_P(PSTR(",\t\tSimple: "));
     if(b)
         cliSerial->printf_P(PSTR("ON\n"));
@@ -1266,10 +993,12 @@ print_done()
 
 static void zero_eeprom(void)
 {
+    byte b = 0;
+
     cliSerial->printf_P(PSTR("\nErasing EEPROM\n"));
 
-    for (uint16_t i = 0; i < EEPROM_MAX_ADDR; i++) {
-        hal.storage->write_byte(i, 0);
+    for (uintptr_t i = 0; i < EEPROM_MAX_ADDR; i++) {
+        eeprom_write_byte((uint8_t *) i, b);
     }
 
     cliSerial->printf_P(PSTR("done\n"));
@@ -1280,7 +1009,7 @@ print_accel_offsets_and_scaling(void)
 {
     Vector3f accel_offsets = ins.get_accel_offsets();
     Vector3f accel_scale = ins.get_accel_scale();
-    cliSerial->printf_P(PSTR("A_off: %4.2f, %4.2f, %4.2f\nA_scale: %4.2f, %4.2f, %4.2f\n"),
+    cliSerial->printf_P(PSTR("A_off: %4.2f, %4.2f, %4.2f\tA_scale: %4.2f, %4.2f, %4.2f\n"),
                     (float)accel_offsets.x,                           // Pitch
                     (float)accel_offsets.y,                           // Roll
                     (float)accel_offsets.z,                           // YAW
@@ -1316,8 +1045,8 @@ heli_get_servo(int16_t servo_num){
 
 // Used to read integer values from the serial port
 static int16_t read_num_from_serial() {
-    uint8_t index = 0;
-    uint8_t timeout = 0;
+    byte index = 0;
+    byte timeout = 0;
     char data[5] = "";
 
     do {
@@ -1380,8 +1109,11 @@ init_esc()
     }
 }
 
-static void print_wp(const struct Location *cmd, uint8_t index)
+static void print_wp(struct Location *cmd, byte index)
 {
+   	//float t1 = (float)cmd->lat / t7;
+    //float t2 = (float)cmd->lng / t7;
+
     cliSerial->printf_P(PSTR("cmd#: %d | %d, %d, %d, %ld, %ld, %ld\n"),
                     index,
                     cmd->id,
@@ -1390,6 +1122,17 @@ static void print_wp(const struct Location *cmd, uint8_t index)
                     cmd->alt,
                     cmd->lat,
                     cmd->lng);
+
+	/*
+    cliSerial->printf_P(PSTR("cmd#: %d id:%d op:%d p1:%d p2:%ld p3:%4.7f p4:%4.7f \n"),
+                    (int)index,
+                    (int)cmd->id,
+                    (int)cmd->options,
+                    (int)cmd->p1,
+                    (long)cmd->alt,
+                    t1,
+                    t2);
+	*/
 }
 
 static void report_version()

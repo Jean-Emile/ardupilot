@@ -2,25 +2,36 @@
 //
 // Unit tests for the AP_Math rotations code
 //
-#include <AP_HAL.h>
-#include <stdlib.h>
-#include <AP_Common.h>
-#include <AP_Progmem.h>
-#include <AP_Param.h>
-#include <AP_HAL_AVR.h>
-#include <AP_HAL_AVR_SITL.h>
-#include <AP_HAL_Empty.h>
-#include <AP_HAL_PX4.h>
-#include <AP_Math.h>
-#include <Filter.h>
-#include <AP_ADC.h>
-#include <SITL.h>
-#include <AP_Compass.h>
-#include <AP_Baro.h>
-#include <GCS_MAVLink.h>
-#include <AP_Declination.h> // ArduPilot Mega Declination Helper Library
 
-const AP_HAL::HAL& hal = AP_HAL_BOARD_DRIVER;
+#include <FastSerial.h>
+#include <AP_Common.h>
+#include <AP_Math.h>
+
+FastSerialPort(Serial, 0);
+
+#ifdef DESKTOP_BUILD
+// all of this is needed to build with SITL
+ #include <SPI.h>
+ #include <I2C.h>
+ #include <DataFlash.h>
+ #include <APM_RC.h>
+ #include <GCS_MAVLink.h>
+ #include <Arduino_Mega_ISR_Registry.h>
+ #include <AP_PeriodicProcess.h>
+ #include <AP_ADC.h>
+ #include <AP_Baro.h>
+ #include <AP_Compass.h>
+ #include <AP_GPS.h>
+ #include <AP_Declination.h> // ArduPilot Mega Declination Helper Library
+ #include <AP_Semaphore.h>
+ #include <Filter.h>
+ #include <AP_Buffer.h>
+ #include <SITL.h>
+Arduino_Mega_ISR_Registry isr_registry;
+AP_Baro_BMP085_HIL barometer;
+AP_Compass_HIL compass;
+#endif
+
 
 // standard rotation matrices (these are the originals from the old code)
 #define MATRIX_ROTATION_NONE               Matrix3f(1, 0, 0, 0, 1, 0, 0,0, 1)
@@ -39,23 +50,13 @@ const AP_HAL::HAL& hal = AP_HAL_BOARD_DRIVER;
 #define MATRIX_ROTATION_ROLL_180_YAW_225   Matrix3f(-0.70710678, -0.70710678, 0, -0.70710678, 0.70710678, 0, 0, 0, -1)
 #define MATRIX_ROTATION_ROLL_180_YAW_270   Matrix3f(0, -1, 0, -1, 0, 0, 0, 0, -1)
 #define MATRIX_ROTATION_ROLL_180_YAW_315   Matrix3f(0.70710678, -0.70710678, 0, -0.70710678, -0.70710678, 0, 0, 0, -1)
-#define MATRIX_ROTATION_ROLL_90            Matrix3f(1, 0,  0,  0, 0, -1,  0,  1, 0)
-#define MATRIX_ROTATION_ROLL_270           Matrix3f(1, 0,  0,  0, 0,  1,  0, -1, 0)
-#define MATRIX_ROTATION_PITCH_90           Matrix3f(0, 0,  1,  0, 1,  0, -1,  0, 0)
-#define MATRIX_ROTATION_PITCH_270          Matrix3f(0, 0, -1,  0, 1,  0,  1,  0, 0)
 
 static void print_matrix(Matrix3f &m)
 {
-    hal.console->printf("[%.2f %.2f %.2f] [%.2f %.2f %.2f] [%.2f %.2f %.2f]\n",
+    Serial.printf("[%.2f %.2f %.2f] [%.2f %.2f %.2f] [%.2f %.2f %.2f]\n",
                   m.a.x, m.a.y, m.a.z,
                   m.b.x, m.b.y, m.b.z,
                   m.c.x, m.c.y, m.c.z);
-}
-
-static void print_vector(Vector3f &v)
-{
-    hal.console->printf("[%.2f %.2f %.2f]\n",
-                        v.x, v.y, v.z);
 }
 
 // test one matrix
@@ -68,7 +69,7 @@ static void test_matrix(enum Rotation rotation, Matrix3f m)
     if (diff.a.length() > accuracy ||
         diff.b.length() > accuracy ||
         diff.c.length() > accuracy) {
-        hal.console->printf("rotation matrix %u incorrect\n", (unsigned)rotation);
+        Serial.printf("rotation matrix %u incorrect\n", (unsigned)rotation);
         print_matrix(m);
         print_matrix(m2);
     }
@@ -77,7 +78,7 @@ static void test_matrix(enum Rotation rotation, Matrix3f m)
 // test generation of rotation matrices
 static void test_matrices(void)
 {
-    hal.console->println("testing rotation matrices\n");
+    Serial.println("testing rotation matrices\n");
     test_matrix(ROTATION_NONE, MATRIX_ROTATION_NONE);
     test_matrix(ROTATION_YAW_45, MATRIX_ROTATION_YAW_45);
     test_matrix(ROTATION_YAW_90, MATRIX_ROTATION_YAW_90);
@@ -94,10 +95,6 @@ static void test_matrices(void)
     test_matrix(ROTATION_ROLL_180_YAW_225, MATRIX_ROTATION_ROLL_180_YAW_225);
     test_matrix(ROTATION_ROLL_180_YAW_270, MATRIX_ROTATION_ROLL_180_YAW_270);
     test_matrix(ROTATION_ROLL_180_YAW_315, MATRIX_ROTATION_ROLL_180_YAW_315);
-    test_matrix(ROTATION_ROLL_90,   MATRIX_ROTATION_ROLL_90);
-    test_matrix(ROTATION_ROLL_270,  MATRIX_ROTATION_ROLL_270);
-    test_matrix(ROTATION_PITCH_90,  MATRIX_ROTATION_PITCH_90);
-    test_matrix(ROTATION_PITCH_270, MATRIX_ROTATION_PITCH_270);
 }
 
 // test rotation of vectors
@@ -111,13 +108,13 @@ static void test_vector(enum Rotation rotation, Vector3f v1, bool show=true)
     v2 = m * v2;
     diff = v1 - v2;
     if (diff.length() > 1.0e-6) {
-        hal.console->printf("rotation vector %u incorrect\n", (unsigned)rotation);
-        hal.console->printf("%u  %f %f %f\n",
+        Serial.printf("rotation vector %u incorrect\n", (unsigned)rotation);
+        Serial.printf("%u  %f %f %f\n",
                       (unsigned)rotation,
                       v2.x, v2.y, v2.z);
     }
     if (show) {
-        hal.console->printf("%u  %f %f %f\n",
+        Serial.printf("%u  %f %f %f\n",
                       (unsigned)rotation,
                       v1.x, v1.y, v1.z);
     }
@@ -152,7 +149,7 @@ static void test_vector(enum Rotation rotation)
 // test rotation of vectors
 static void test_vectors(void)
 {
-    hal.console->println("testing rotation of vectors\n");
+    Serial.println("testing rotation of vectors\n");
     test_vector(ROTATION_NONE);
     test_vector(ROTATION_YAW_45);
     test_vector(ROTATION_YAW_90);
@@ -172,12 +169,6 @@ static void test_vectors(void)
 }
 
 
-static void new_combination(enum Rotation r1, enum Rotation r2)
-{
-    
-}
-
-#if ROTATION_COMBINATION_SUPPORT
 // test combinations of rotations
 static void test_combinations(void)
 {
@@ -190,18 +181,15 @@ static void test_combinations(void)
              r2 = (enum Rotation)((uint8_t)r2+1)) {
             r3 = rotation_combination(r1, r2, &found);
             if (found) {
-                hal.console->printf("rotation: %u + %u -> %u\n",
+                Serial.printf("rotation: %u + %u -> %u\n",
                               (unsigned)r1, (unsigned)r2, (unsigned)r3);
             } else {
-                hal.console->printf("ERROR rotation: no combination for %u + %u\n",
+                Serial.printf("ERROR rotation: no combination for %u + %u\n",
                               (unsigned)r1, (unsigned)r2);
-                new_combination(r1, r2);
             }
         }
     }
 }
-#endif
-
 
 // test rotation method accuracy
 static void test_rotation_accuracy(void)
@@ -212,7 +200,7 @@ static void test_rotation_accuracy(void)
     int16_t i;
     float rot_angle;
 
-    hal.console->println_P(PSTR("\nRotation method accuracy:"));
+    Serial.println("\nRotation method accuracy:");
 
     for( i=0; i<90; i++ ) {
 
@@ -230,71 +218,8 @@ static void test_rotation_accuracy(void)
         attitude.to_euler(&roll, &pitch, &yaw);
 
         // display results
-        hal.console->printf_P(
-                PSTR("actual angle: %d\tcalculated angle:%4.2f\n"),
-                (int)i,ToDeg(yaw));
+        Serial.printf_P(PSTR("actual angle: %d\tcalculated angle:%4.2f\n"),(int)i,ToDeg(yaw));
     }
-}
-
-static void test_euler(enum Rotation rotation, float roll, float pitch, float yaw)
-{
-    Vector3f v, v1, v2, diff;
-    Matrix3f rotmat;
-    const float accuracy = 1.0e-6;
-
-    v.x = 1;
-    v.y = 2;
-    v.z = 3;
-    v1 = v;
-
-    v1.rotate(rotation);
-    
-    rotmat.from_euler(radians(roll), radians(pitch), radians(yaw));
-    v2 = v;
-    v2 = rotmat * v2;
-
-    diff = (v2 - v1);
-    if (diff.length() > accuracy) {
-        hal.console->printf("euler test %u incorrect\n", (unsigned)rotation);
-        print_vector(v);
-        print_vector(v1);
-        print_vector(v2);
-    }
-#if 0
-    if (rotation >= ROTATION_ROLL_90_YAW_45)
-        print_matrix(rotmat);
-#endif
-}
-
-static void test_eulers(void)
-{
-    hal.console->println("euler tests");
-    test_euler(ROTATION_NONE,               0,   0,   0);
-    test_euler(ROTATION_YAW_45,             0,   0,  45);
-    test_euler(ROTATION_YAW_90,             0,   0,  90);
-    test_euler(ROTATION_YAW_135,            0,   0, 135);
-    test_euler(ROTATION_YAW_180,            0,   0, 180);
-    test_euler(ROTATION_YAW_225,            0,   0, 225);
-    test_euler(ROTATION_YAW_270,            0,   0, 270);
-    test_euler(ROTATION_YAW_315,            0,   0, 315);
-    test_euler(ROTATION_ROLL_180,         180,   0,   0);
-    test_euler(ROTATION_ROLL_180_YAW_45,  180,   0,  45);
-    test_euler(ROTATION_ROLL_180_YAW_90,  180,   0,  90);
-    test_euler(ROTATION_ROLL_180_YAW_135, 180,   0, 135);
-    test_euler(ROTATION_PITCH_180,          0, 180,   0);
-    test_euler(ROTATION_ROLL_180_YAW_225, 180,   0, 225);
-    test_euler(ROTATION_ROLL_180_YAW_270, 180,   0, 270);
-    test_euler(ROTATION_ROLL_180_YAW_315, 180,   0, 315);
-    test_euler(ROTATION_ROLL_90,           90,   0,   0);
-    test_euler(ROTATION_ROLL_90_YAW_45,    90,   0,  45);
-    test_euler(ROTATION_ROLL_90_YAW_90,    90,   0,  90);
-    test_euler(ROTATION_ROLL_90_YAW_135,   90,   0, 135);
-    test_euler(ROTATION_ROLL_270,         270,   0,   0);
-    test_euler(ROTATION_ROLL_270_YAW_45,  270,   0,  45);
-    test_euler(ROTATION_ROLL_270_YAW_90,  270,   0,  90);
-    test_euler(ROTATION_ROLL_270_YAW_135, 270,   0, 135);
-    test_euler(ROTATION_PITCH_90,           0,  90,   0);
-    test_euler(ROTATION_PITCH_270,          0, 270,   0);    
 }
 
 /*
@@ -302,17 +227,16 @@ static void test_eulers(void)
  */
 void setup(void)
 {
-    hal.console->println("rotation unit tests\n");
+    Serial.begin(115200);
+    Serial.println("rotation unit tests\n");
     test_matrices();
     test_vectors();
-#if ROTATION_COMBINATION_SUPPORT
     test_combinations();
-#endif
     test_rotation_accuracy();
-    test_eulers();
-    hal.console->println("rotation unit tests done\n");
+    Serial.println("rotation unit tests done\n");
 }
 
-void loop(void) {}
-
-AP_HAL_MAIN();
+void
+loop(void)
+{
+}

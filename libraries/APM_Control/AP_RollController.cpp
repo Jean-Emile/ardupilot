@@ -7,12 +7,9 @@
 //	License as published by the Free Software Foundation; either
 //	version 2.1 of the License, or (at your option) any later version.
 
-#include <AP_Math.h>
-#include <AP_HAL.h>
+#include <math.h>
 
 #include "AP_RollController.h"
-
-extern const AP_HAL::HAL& hal;
 
 const AP_Param::GroupInfo AP_RollController::var_info[] PROGMEM = {
 	AP_GROUPINFO("AP",    0, AP_RollController, _kp_angle,           1.0),
@@ -26,7 +23,7 @@ const AP_Param::GroupInfo AP_RollController::var_info[] PROGMEM = {
 
 int32_t AP_RollController::get_servo_out(int32_t angle, float scaler, bool stabilize)
 {
-	uint32_t tnow = hal.scheduler->millis();
+	uint32_t tnow = millis();
 	uint32_t dt = tnow - _last_t;
 	if (_last_t == 0 || dt > 1000) {
 		dt = 0;
@@ -34,13 +31,13 @@ int32_t AP_RollController::get_servo_out(int32_t angle, float scaler, bool stabi
 	_last_t = tnow;
 	
 	if(_ahrs == NULL) return 0; // can't control without a reference
-	float delta_time    = (float)dt / 1000.0f;
+	float delta_time    = (float)dt / 1000.0;
 	
 	int32_t angle_err = angle - _ahrs->roll_sensor;
 	
 	float rate = _ahrs->get_roll_rate_earth();
 	
-	float RC = 1/(2*PI*_fCut);
+	float RC = 1/(2*M_PI*_fCut);
 	rate = _last_rate +
 	(delta_time / (RC + delta_time)) * (rate - _last_rate);
 	_last_rate = rate;
@@ -60,7 +57,7 @@ int32_t AP_RollController::get_servo_out(int32_t angle, float scaler, bool stabi
 	
 	//rate integrator
         if (!stabilize) {
-		if ((fabsf(_ki_rate) > 0) && (dt > 0))
+		if ((fabs(_ki_rate) > 0) && (dt > 0))
 		{
 			_integrator += (rate_error * _ki_rate) * scaler * delta_time;
 			if (_integrator < -4500-out) _integrator = -4500-out;

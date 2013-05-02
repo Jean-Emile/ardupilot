@@ -114,7 +114,6 @@ static void handle_process_do_command()
         break;
 
     case MAV_CMD_DO_DIGICAM_CONTROL:                    // Mission command to control an on-board camera controller system. |Session control e.g. show/hide lens| Zoom's absolute position| Zooming step value to offset zoom from the current position| Focus Locking, Unlocking or Re-locking| Shooting Command| Command Identity| Empty|
-        do_take_picture();
         break;
 #endif
 
@@ -156,13 +155,9 @@ static void handle_no_commands()
 
 }
 
-/*******************************************************************************
-Verify command Handlers
-
-Each type of mission element has a "verify" operation. The verify
-operation returns true when the mission element has completed and we
-should move onto the next mission element.
-*******************************************************************************/
+/********************************************************************************/
+// Verify command Handlers
+/********************************************************************************/
 
 static bool verify_nav_command()        // Returns true if command complete
 {
@@ -235,12 +230,6 @@ static void do_RTL(void)
     crash_timer     = 0;
     next_WP                 = home;
 
-    if (g.loiter_radius < 0) {
-        loiter.direction = -1;
-    } else {
-        loiter.direction = 1;
-    }
-
     // Altitude to hold over home
     // Set by configuration tool
     // -------------------------
@@ -272,35 +261,22 @@ static void do_land()
     set_next_WP(&next_nav_command);
 }
 
-static void loiter_set_direction_wp(const struct Location *nav_command)
-{
-    if (nav_command->options & MASK_OPTIONS_LOITER_DIRECTION) {
-        loiter.direction = -1;
-    } else {
-        loiter.direction = 1;
-    }
-}
-
 static void do_loiter_unlimited()
 {
     set_next_WP(&next_nav_command);
-    loiter_set_direction_wp(&next_nav_command);
 }
 
 static void do_loiter_turns()
 {
     set_next_WP(&next_nav_command);
-    loiter.total_cd = next_nav_command.p1 * 36000UL;
-    loiter_set_direction_wp(&next_nav_command);
+    loiter_total = next_nav_command.p1 * 360;
 }
 
 static void do_loiter_time()
 {
     set_next_WP(&next_nav_command);
-    // we set start_time_ms when we reach the waypoint
-    loiter.start_time_ms = 0;
-    loiter.time_max_ms = next_nav_command.p1 * (uint32_t)1000;     // units are seconds
-    loiter_set_direction_wp(&next_nav_command);
+    loiter_time_ms = millis();
+    loiter_time_max_ms = next_nav_command.p1 * (uint32_t)1000;     // units are seconds
 }
 
 /********************************************************************************/
@@ -309,24 +285,24 @@ static void do_loiter_time()
 static bool verify_takeoff()
 {
     if (ahrs.yaw_initialised()) {
-        if (hold_course_cd == -1) {
+        if (hold_course == -1) {
             // save our current course to take off
-            hold_course_cd = ahrs.yaw_sensor;
-            gcs_send_text_fmt(PSTR("Holding course %ld"), hold_course_cd);
+            hold_course = ahrs.yaw_sensor;
+            gcs_send_text_fmt(PSTR("Holding course %ld"), hold_course);
         }
     }
 
-    if (hold_course_cd != -1) {
-        // call navigation controller for heading hold
-        nav_controller->update_heading_hold(hold_course_cd);
-    } else {
-        nav_controller->update_level_flight();        
+    if (hold_course != -1) {
+        // recalc bearing error with hold_course;
+        nav_bearing_cd = hold_course;
+        // recalc bearing error
+        calc_bearing_error();
     }
 
     if (adjusted_altitude_cm() > takeoff_altitude)  {
-        hold_course_cd = -1;
+        hold_course = -1;
         takeoff_complete = true;
-        next_WP = prev_WP = current_loc;
+        next_WP = current_loc;
         return true;
     } else {
         return false;
@@ -342,57 +318,59 @@ static bool verify_land()
 
     // Set land_complete if we are within 2 seconds distance or within
     // 3 meters altitude of the landing point
-    if ((wp_distance <= (g.land_flare_sec*g_gps->ground_speed*0.01))
+    if (((wp_distance > 0) && (wp_distance <= (g.land_flare_sec*g_gps->ground_speed*0.01)))
         || (adjusted_altitude_cm() <= next_WP.alt + g.land_flare_alt*100)) {
 
         land_complete = true;
 
-        if (hold_course_cd == -1) {
+        if (hold_course == -1) {
             // we have just reached the threshold of to flare for landing.
             // We now don't want to do any radical
             // turns, as rolling could put the wings into the runway.
-            // To prevent further turns we set hold_course_cd to the
+            // To prevent further turns we set hold_course to the
             // current heading. Previously we set this to
             // crosstrack_bearing, but the xtrack bearing can easily
             // be quite large at this point, and that could induce a
             // sudden large roll correction which is very nasty at
             // this point in the landing.
-            hold_course_cd = ahrs.yaw_sensor;
-            gcs_send_text_fmt(PSTR("Land Complete - Hold course %ld"), hold_course_cd);
+            hold_course = ahrs.yaw_sensor;
+            gcs_send_text_fmt(PSTR("Land Complete - Hold course %ld"), hold_course);
         }
 
-        if (g_gps->ground_speed*0.01 < 3.0) {
-            // reload any airspeed or groundspeed parameters that may have
-            // been set for landing. We don't do this till ground
-            // speed drops below 3.0 m/s as otherwise we will change
-            // target speeds too early.
-            g.airspeed_cruise_cm.load();
-            g.min_gndspeed_cm.load();
-            g.throttle_cruise.load();
-        }
+        // reload any airspeed or groundspeed parameters that may have
+        // been set for landing
+        g.airspeed_cruise_cm.load();
+        g.min_gndspeed_cm.load();
+        g.throttle_cruise.load();
     }
 
-    if (hold_course_cd != -1) {
+    if (hold_course != -1) {
         // recalc bearing error with hold_course;
-        nav_controller->update_heading_hold(hold_course_cd);
+        nav_bearing_cd = hold_course;
+        // recalc bearing error
+        calc_bearing_error();
     } else {
-        nav_controller->update_waypoint(prev_WP, next_WP);
+        update_crosstrack();
     }
     return false;
 }
 
 static bool verify_nav_wp()
 {
-    hold_course_cd = -1;
-
-    nav_controller->update_waypoint(prev_WP, next_WP);
-    
-    if (wp_distance <= nav_controller->turn_distance(g.waypoint_radius)) {
+    hold_course = -1;
+    update_crosstrack();
+    if ((wp_distance > 0) && (wp_distance <= g.waypoint_radius)) {
         gcs_send_text_fmt(PSTR("Reached Waypoint #%i dist %um"),
                           (unsigned)nav_command_index,
                           (unsigned)get_distance(&current_loc, &next_WP));
         return true;
-	}
+    }
+
+    // have we circled around the waypoint?
+    if (loiter_sum > 300) {
+        gcs_send_text_P(SEVERITY_MEDIUM,PSTR("Missed WP"));
+        return true;
+    }
 
     // have we flown past the waypoint?
     if (location_passed_point(current_loc, prev_WP, next_WP)) {
@@ -408,18 +386,15 @@ static bool verify_nav_wp()
 static bool verify_loiter_unlim()
 {
     update_loiter();
+    calc_bearing_error();
     return false;
 }
 
 static bool verify_loiter_time()
 {
     update_loiter();
-    if (loiter.start_time_ms == 0) {
-        if (nav_controller->reached_loiter_target()) {
-            // we've reached the target, start the timer
-            loiter.start_time_ms = millis();
-        }
-    } else if ((millis() - loiter.start_time_ms) > loiter.time_max_ms) {
+    calc_bearing_error();
+    if ((millis() - loiter_time_ms) > loiter_time_max_ms) {
         gcs_send_text_P(SEVERITY_LOW,PSTR("verify_nav: LOITER time complete"));
         return true;
     }
@@ -429,8 +404,9 @@ static bool verify_loiter_time()
 static bool verify_loiter_turns()
 {
     update_loiter();
-    if (loiter.sum_cd > loiter.total_cd) {
-        loiter.total_cd = 0;
+    calc_bearing_error();
+    if(loiter_sum > loiter_total) {
+        loiter_total = 0;
         gcs_send_text_P(SEVERITY_LOW,PSTR("verify_nav: LOITER orbits complete"));
         // clear the command queue;
         return true;
@@ -440,14 +416,12 @@ static bool verify_loiter_turns()
 
 static bool verify_RTL()
 {
-    update_loiter();
-	if (wp_distance <= (uint32_t)max(g.waypoint_radius,0) || 
-        nav_controller->reached_loiter_target()) {
-			gcs_send_text_P(SEVERITY_LOW,PSTR("Reached home"));
-			return true;
-    } else {
+    if (wp_distance <= g.waypoint_radius) {
+        gcs_send_text_P(SEVERITY_LOW,PSTR("Reached home"));
+        return true;
+    }else{
         return false;
-	}
+    }
 }
 
 /********************************************************************************/
@@ -503,7 +477,7 @@ static bool verify_change_alt()
 
 static bool verify_within_distance()
 {
-    if (wp_distance < max(condition_value,0)) {
+    if (wp_distance < condition_value) {
         condition_value = 0;
         return true;
     }
@@ -516,11 +490,6 @@ static bool verify_within_distance()
 
 static void do_loiter_at_location()
 {
-    if (g.loiter_radius < 0) {
-        loiter.direction = -1;
-    } else {
-        loiter.direction = 1;
-    }
     next_WP = current_loc;
 }
 
@@ -595,7 +564,7 @@ static void do_change_speed()
 
 static void do_set_home()
 {
-    if (next_nonnav_command.p1 == 1 && g_gps->status() == GPS::GPS_OK_FIX_3D) {
+    if (next_nonnav_command.p1 == 1 && g_gps->status() == GPS::GPS_OK) {
         init_home();
     } else {
         home.id         = MAV_CMD_NAV_WAYPOINT;
@@ -608,12 +577,12 @@ static void do_set_home()
 
 static void do_set_servo()
 {
-    servo_write(next_nonnav_command.p1 - 1, next_nonnav_command.alt);
+    APM_RC.enable_out(next_nonnav_command.p1 - 1);
+    APM_RC.OutputCh(next_nonnav_command.p1 - 1, next_nonnav_command.alt);
 }
 
 static void do_set_relay()
 {
-#if CONFIG_RELAY == ENABLED
     if (next_nonnav_command.p1 == 1) {
         relay.on();
     } else if (next_nonnav_command.p1 == 0) {
@@ -621,13 +590,12 @@ static void do_set_relay()
     }else{
         relay.toggle();
     }
-#endif
 }
 
 static void do_repeat_servo(uint8_t channel, uint16_t servo_value,
                             int16_t repeat, uint8_t delay_time)
 {
-    extern RC_Channel *rc_ch[8];
+    extern RC_Channel *rc_ch[NUM_CHANNELS];
     channel = channel - 1;
     if (channel < 5 || channel > 8) {
         // not allowed
@@ -652,13 +620,4 @@ static void do_repeat_relay()
     event_state.delay_ms        = next_nonnav_command.lat * 500.0;
     event_state.repeat          = next_nonnav_command.alt * 2;
     update_events();
-}
-
-// do_take_picture - take a picture with the camera library
-static void do_take_picture()
-{
-#if CAMERA == ENABLED
-    camera.trigger_pic();
-    Log_Write_Camera();
-#endif
 }

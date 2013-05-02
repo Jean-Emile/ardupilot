@@ -11,11 +11,11 @@
 ///         the downside being that it's a little slower as it internally uses a float
 ///         and it consumes an extra 4 bytes of memory to hold the constant gain
 
-#ifndef __LOW_PASS_FILTER_H__
-#define __LOW_PASS_FILTER_H__
+#ifndef LowPassFilter_h
+#define LowPassFilter_h
 
-#include <AP_Math.h>
-#include "FilterClass.h"
+#include <inttypes.h>
+#include <Filter.h>
 
 // 1st parameter <T> is the type of data being filtered.
 template <class T>
@@ -78,7 +78,7 @@ template <class T>
 void LowPassFilter<T>::set_cutoff_frequency(float time_step, float cutoff_freq)
 {
     // calculate alpha
-    float rc = 1/(2*PI*cutoff_freq);
+    float rc = 1/(2*M_PI*cutoff_freq);
     _alpha = time_step / (time_step + rc);
 }
 
@@ -106,4 +106,4 @@ T LowPassFilter<T>::apply(T sample)
     return (T)_base_value;
 }
 
-#endif // __LOW_PASS_FILTER_H__
+#endif

@@ -1,5 +1,6 @@
 #
 # Trivial makefile for building APM
 #
-include ../../mk/apm.mk
+BOARD=mega
+include ../../libraries/AP_Common/Arduino.mk
 

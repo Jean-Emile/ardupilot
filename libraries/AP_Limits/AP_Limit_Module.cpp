@@ -1,9 +1,8 @@
 // -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
 
-/// @brief	Imposes limits on location (geofence), altitude and other parameters
-/// Each breach will trigger an action or set of actions to recover.
-/// Adapted from geofence.
+/// @brief	Imposes limits on location (geofence), altitude and other parameters.
+///         Each breach will trigger an action or set of actions to recover. Adapted from geofence.
 /// @author Andrew Tridgell
 ///         Andreas Antonopoulos
 

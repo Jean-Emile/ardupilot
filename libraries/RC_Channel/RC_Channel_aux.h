@@ -4,8 +4,8 @@
 /// @brief	RC_Channel manager for auxiliary channels (5..8), with EEPROM-backed storage of constants.
 /// @author Amilcar Lucas
 
-#ifndef __RC_CHANNEL_AUX_H__
-#define __RC_CHANNEL_AUX_H__
+#ifndef RC_CHANNEL_AUX_H_
+#define RC_CHANNEL_AUX_H_
 
 #include "RC_Channel.h"
 
@@ -21,7 +21,6 @@ public:
     RC_Channel_aux(uint8_t ch_out) :
         RC_Channel(ch_out)
     {
-		AP_Param::setup_object_defaults(this, var_info);
     }
 
     typedef enum
@@ -45,8 +44,6 @@ public:
 		k_dspoiler1     = 16,           ///< differential spoiler 1 (left wing)
 		k_dspoiler2     = 17,           ///< differential spoiler 2 (right wing)
         k_aileron_with_input    = 18,            ///< aileron, with rc input
-        k_elevator              = 19,            ///< elevator
-        k_elevator_with_input   = 20,            ///< elevator, with rc input
         k_nr_aux_servo_functions         ///< This must be the last enum value (only add new values _before_ this one)
     } Aux_servo_function_t;
 
@@ -88,7 +85,7 @@ public:
 void update_aux_servo_function(RC_Channel_aux* rc_a = NULL, RC_Channel_aux* rc_b = NULL, 
 							   RC_Channel_aux* rc_c = NULL, RC_Channel_aux* rc_d = NULL, 
 							   RC_Channel_aux* rc_e = NULL, RC_Channel_aux* rc_f = NULL, 
-							   RC_Channel_aux* rc_g = NULL, RC_Channel_aux* rc_h = NULL);
+							   RC_Channel_aux* rc_g = NULL);
 void enable_aux_servos();
 
 #endif /* RC_CHANNEL_AUX_H_ */

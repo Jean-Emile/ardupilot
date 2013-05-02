@@ -1,7 +1,7 @@
 // -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: t -*-
 
+#include <FastSerial.h>
 #include <AP_Common.h>
-#include <AP_Progmem.h>
 #include <AP_Param.h>
 #include <AP_Mount.h>
 
@@ -32,97 +32,52 @@ const AP_Param::GroupInfo AP_Mount::var_info[] PROGMEM = {
     AP_GROUPINFO("MODE",       0, AP_Mount, _mount_mode, MAV_MOUNT_MODE_RETRACT), // see MAV_MOUNT_MODE at ardupilotmega.h
 
 #if MNT_RETRACT_OPTION == ENABLED
-    // @Param: RETRACT_X
-    // @DisplayName: Mount roll angle when in retracted position
-    // @Description: Mount roll angle when in retracted position
-    // @Units: Centi-Degrees
-    // @Range: -18000 17999
-    // @Increment: 1
-    // @User: Standard
-
-    // @Param: RETRACT_Y
-    // @DisplayName: Mount tilt/pitch angle when in retracted position
-    // @Description: Mount tilt/pitch angle when in retracted position
-    // @Units: Centi-Degrees
-    // @Range: -18000 17999
-    // @Increment: 1
-    // @User: Standard
-
-    // @Param: RETRACT_Z
-    // @DisplayName: Mount yaw/pan angle when in retracted position
-    // @Description: Mount yaw/pan angle when in retracted position
-    // @Units: Centi-Degrees
+    // @Param: RETRACT
+    // @DisplayName: Mount retract angles
+    // @Description: Mount angles when in retract operation mode
+    // @Units: centi-Degrees
     // @Range: -18000 17999
     // @Increment: 1
     // @User: Standard
     AP_GROUPINFO("RETRACT",    1, AP_Mount, _retract_angles, 0),
 #endif
 
-    // @Param: NEUTRAL_X
-    // @DisplayName: Mount roll angle when in neutral position
-    // @Description: Mount roll angle when in neutral position
-    // @Units: Centi-Degrees
-    // @Range: -18000 17999
-    // @Increment: 1
-    // @User: Standard
-
-    // @Param: NEUTRAL_Y
-    // @DisplayName: Mount tilt/pitch angle when in neutral position
-    // @Description: Mount tilt/pitch angle when in neutral position
-    // @Units: Centi-Degrees
-    // @Range: -18000 17999
-    // @Increment: 1
-    // @User: Standard
-
-    // @Param: NEUTRAL_Z
-    // @DisplayName: Mount pan/yaw angle when in neutral position
-    // @Description: Mount pan/yaw angle when in neutral position
-    // @Units: Centi-Degrees
+    // @Param: NEUTRAL
+    // @DisplayName: Mount neutral angles
+    // @Description: Mount angles when in neutral operation mode
+    // @Units: centi-Degrees
     // @Range: -18000 17999
     // @Increment: 1
     // @User: Standard
     AP_GROUPINFO("NEUTRAL",    2, AP_Mount, _neutral_angles, 0),
 
-    // @Param: CONTROL_X
-    // @DisplayName: Mount roll angle command from groundstation
-    // @Description: Mount roll angle when in MavLink or RC control operation mode
-    // @Units: Centi-Degrees
+    // @Param: CONTROL
+    // @DisplayName: Mount control angles
+    // @Description: Mount angles when in MavLink or RC control operation mode
+    // @Units: centi-Degrees
     // @Range: -18000 17999
     // @Increment: 1
-
-    // @Param: CONTROL_Y
-    // @DisplayName: Mount tilt/pitch angle command from groundstation
-    // @Description: Mount tilt/pitch angle when in MavLink or RC control operation mode
-    // @Units: Centi-Degrees
-    // @Range: -18000 17999
-    // @Increment: 1
-
-    // @Param: CONTROL_Z
-    // @DisplayName: Mount pan/yaw angle command from groundstation
-    // @Description: Mount pan/yaw angle when in MavLink or RC control operation mode
-    // @Units: Centi-Degrees
-    // @Range: -18000 17999
-    // @Increment: 1
+    // @User: Standard
     AP_GROUPINFO("CONTROL",    3, AP_Mount, _control_angles, 0),
 
 #if MNT_STABILIZE_OPTION == ENABLED
     // @Param: STAB_ROLL
-    // @DisplayName: Stabilize mount's roll angle
+    // @DisplayName: Stabilize mount roll
     // @Description:enable roll stabilisation relative to Earth
     // @Values: 0:Disabled,1:Enabled
     // @User: Standard
     AP_GROUPINFO("STAB_ROLL",  4, AP_Mount, _stab_roll, 0),
 
     // @Param: STAB_TILT
-    // @DisplayName: Stabilize mount's pitch/tilt angle
-    // @Description: enable tilt/pitch stabilisation relative to Earth
+    // @DisplayName: Stabilize mount tilt
+    // @Description: enable tilt (pitch) stabilisation relative to Earth
     // @Values: 0:Disabled,1:Enabled
     // @User: Standard
     AP_GROUPINFO("STAB_TILT", 5, AP_Mount, _stab_tilt,  0),
 
     // @Param: STAB_PAN
-    // @DisplayName: Stabilize mount pan/yaw angle
-    // @Description: enable pan/yaw stabilisation relative to Earth
+    // @DisplayName: Stabilize mount pan
+    // @Description: enable pan (yaw) stabilisation relative to Earth
     // @Values: 0:Disabled,1:Enabled
     // @User: Standard
     AP_GROUPINFO("STAB_PAN",   6, AP_Mount, _stab_pan,  0),
@@ -138,7 +93,7 @@ const AP_Param::GroupInfo AP_Mount::var_info[] PROGMEM = {
     // @Param: ANGMIN_ROL
     // @DisplayName: Minimum roll angle
     // @Description: Minimum physical roll angular position of mount.
-    // @Units: Centi-Degrees
+    // @Units: centi-Degrees
     // @Range: -18000 17999
     // @Increment: 1
     // @User: Standard
@@ -147,7 +102,7 @@ const AP_Param::GroupInfo AP_Mount::var_info[] PROGMEM = {
     // @Param: ANGMAX_ROL
     // @DisplayName: Maximum roll angle
     // @Description: Maximum physical roll angular position of the mount
-    // @Units: Centi-Degrees
+    // @Units: centi-Degrees
     // @Range: -18000 17999
     // @Increment: 1
     // @User: Standard
@@ -163,7 +118,7 @@ const AP_Param::GroupInfo AP_Mount::var_info[] PROGMEM = {
     // @Param: ANGMIN_TIL
     // @DisplayName: Minimum tilt angle
     // @Description: Minimum physical tilt (pitch) angular position of mount.
-    // @Units: Centi-Degrees
+    // @Units: centi-Degrees
     // @Range: -18000 17999
     // @Increment: 1
     // @User: Standard
@@ -172,7 +127,7 @@ const AP_Param::GroupInfo AP_Mount::var_info[] PROGMEM = {
     // @Param: ANGMAX_TIL
     // @DisplayName: Maximum tilt angle
     // @Description: Maximum physical tilt (pitch) angular position of the mount
-    // @Units: Centi-Degrees
+    // @Units: centi-Degrees
     // @Range: -18000 17999
     // @Increment: 1
     // @User: Standard
@@ -188,7 +143,7 @@ const AP_Param::GroupInfo AP_Mount::var_info[] PROGMEM = {
     // @Param: ANGMIN_PAN
     // @DisplayName: Minimum pan angle
     // @Description: Minimum physical pan (yaw) angular position of mount.
-    // @Units: Centi-Degrees
+    // @Units: centi-Degrees
     // @Range: -18000 17999
     // @Increment: 1
     // @User: Standard
@@ -197,7 +152,7 @@ const AP_Param::GroupInfo AP_Mount::var_info[] PROGMEM = {
     // @Param: ANGMAX_PAN
     // @DisplayName: Maximum pan angle
     // @Description: Maximum physical pan (yaw) angular position of the mount
-    // @Units: Centi-Degrees
+    // @Units: centi-Degrees
     // @Range: -18000 17999
     // @Increment: 1
     // @User: Standard
@@ -206,8 +161,8 @@ const AP_Param::GroupInfo AP_Mount::var_info[] PROGMEM = {
 #if MNT_JSTICK_SPD_OPTION == ENABLED
     // @Param: JSTICK_SPD
     // @DisplayName: mount joystick speed
-    // @Description: 0 for position control, small for low speeds, 100 for max speed. A good general value is 10 which gives a movement speed of 3 degrees per second.
-    // @Range: 0 100
+    // @Description: 0 for position control, small for low speeds, 10 for max speed
+    // @Range: 0 10
     // @Increment: 1
     // @User: Standard
     AP_GROUPINFO("JSTICK_SPD",  16, AP_Mount, _joystick_speed, 0),
@@ -216,12 +171,11 @@ const AP_Param::GroupInfo AP_Mount::var_info[] PROGMEM = {
     AP_GROUPEND
 };
 
-extern RC_Channel* rc_ch[8];
+extern RC_Channel* rc_ch[NUM_CHANNELS];
 
 AP_Mount::AP_Mount(const struct Location *current_loc, GPS *&gps, AP_AHRS *ahrs, uint8_t id) :
     _gps(gps)
 {
-	AP_Param::setup_object_defaults(this, var_info);
     _ahrs = ahrs;
     _current_loc = current_loc;
 
@@ -345,19 +299,22 @@ void AP_Mount::update_mount_position()
         if (_joystick_speed) {                  // for spring loaded joysticks
             // allow pilot speed position input to come directly from an RC_Channel
             if (_roll_rc_in && (rc_ch[_roll_rc_in-1])) {
-                _roll_control_angle += rc_ch[_roll_rc_in-1]->norm_input() * 0.0001f * _joystick_speed;
-                if (_roll_control_angle < radians(_roll_angle_min*0.01f)) _roll_control_angle = radians(_roll_angle_min*0.01f);
-                if (_roll_control_angle > radians(_roll_angle_max*0.01f)) _roll_control_angle = radians(_roll_angle_max*0.01f);
+                //_roll_control_angle += angle_input(rc_ch[_roll_rc_in-1], _roll_angle_min, _roll_angle_max) * 0.00001 * _joystick_speed;
+                _roll_control_angle += rc_ch[_roll_rc_in-1]->norm_input() * 0.00001 * _joystick_speed;
+                if (_roll_control_angle < radians(_roll_angle_min*0.01)) _roll_control_angle = radians(_roll_angle_min*0.01);
+                if (_roll_control_angle > radians(_roll_angle_max*0.01)) _roll_control_angle = radians(_roll_angle_max*0.01);
             }
             if (_tilt_rc_in && (rc_ch[_tilt_rc_in-1])) {
-                _tilt_control_angle += rc_ch[_tilt_rc_in-1]->norm_input() * 0.0001f * _joystick_speed;
-                if (_tilt_control_angle < radians(_tilt_angle_min*0.01f)) _tilt_control_angle = radians(_tilt_angle_min*0.01f);
-                if (_tilt_control_angle > radians(_tilt_angle_max*0.01f)) _tilt_control_angle = radians(_tilt_angle_max*0.01f);
+                //_tilt_control_angle += angle_input(rc_ch[_tilt_rc_in-1], _tilt_angle_min, _tilt_angle_max) * 0.00001 * _joystick_speed;
+                _tilt_control_angle += rc_ch[_tilt_rc_in-1]->norm_input() * 0.00001 * _joystick_speed;
+                if (_tilt_control_angle < radians(_tilt_angle_min*0.01)) _tilt_control_angle = radians(_tilt_angle_min*0.01);
+                if (_tilt_control_angle > radians(_tilt_angle_max*0.01)) _tilt_control_angle = radians(_tilt_angle_max*0.01);
             }
             if (_pan_rc_in && (rc_ch[_pan_rc_in-1])) {
-                _pan_control_angle += rc_ch[_pan_rc_in-1]->norm_input() * 0.0001f * _joystick_speed;
-                if (_pan_control_angle < radians(_pan_angle_min*0.01f)) _pan_control_angle = radians(_pan_angle_min*0.01f);
-                if (_pan_control_angle > radians(_pan_angle_max*0.01f)) _pan_control_angle = radians(_pan_angle_max*0.01f);
+                //_pan_control_angle += angle_input(rc_ch[_pan_rc_in-1], _pan_angle_min, _pan_angle_max) * 0.00001 * _joystick_speed;
+                _pan_control_angle += rc_ch[_pan_rc_in-1]->norm_input() * 0.00001 * _joystick_speed;
+                if (_pan_control_angle < radians(_pan_angle_min*0.01)) _pan_control_angle = radians(_pan_angle_min*0.01);
+                if (_pan_control_angle > radians(_pan_angle_max*0.01)) _pan_control_angle = radians(_pan_angle_max*0.01);
             }
         } else {
 #endif
@@ -405,9 +362,9 @@ void AP_Mount::update_mount_position()
 #endif
 
     // write the results to the servos
-    move_servo(_roll_idx, _roll_angle*10, _roll_angle_min*0.1f, _roll_angle_max*0.1f);
-    move_servo(_tilt_idx, _tilt_angle*10, _tilt_angle_min*0.1f, _tilt_angle_max*0.1f);
-    move_servo(_pan_idx,  _pan_angle*10,  _pan_angle_min*0.1f,  _pan_angle_max*0.1f);
+    move_servo(_roll_idx, _roll_angle*10, _roll_angle_min*0.1, _roll_angle_max*0.1);
+    move_servo(_tilt_idx, _tilt_angle*10, _tilt_angle_min*0.1, _tilt_angle_max*0.1);
+    move_servo(_pan_idx,  _pan_angle*10,  _pan_angle_min*0.1,  _pan_angle_max*0.1);
 }
 
 void AP_Mount::set_mode(enum MAV_MOUNT_MODE mode)
@@ -446,7 +403,7 @@ void AP_Mount::control_msg(mavlink_message_t *msg)
     {
 #if MNT_RETRACT_OPTION == ENABLED
     case MAV_MOUNT_MODE_RETRACT:      // Load and keep safe position (Roll,Pitch,Yaw) from EEPROM and stop stabilization
-        set_retract_angles(packet.input_b*0.01f, packet.input_a*0.01f, packet.input_c*0.01f);
+        set_retract_angles(packet.input_b*0.01, packet.input_a*0.01, packet.input_c*0.01);
         if (packet.save_position)
         {
             _retract_angles.save();
@@ -455,7 +412,7 @@ void AP_Mount::control_msg(mavlink_message_t *msg)
 #endif
 
     case MAV_MOUNT_MODE_NEUTRAL:      //  Load and keep neutral position (Roll,Pitch,Yaw) from EEPROM
-        set_neutral_angles(packet.input_b*0.01f, packet.input_a*0.01f, packet.input_c*0.01f);
+        set_neutral_angles(packet.input_b*0.01, packet.input_a*0.01, packet.input_c*0.01);
         if (packet.save_position)
         {
             _neutral_angles.save();
@@ -463,7 +420,7 @@ void AP_Mount::control_msg(mavlink_message_t *msg)
         break;
 
     case MAV_MOUNT_MODE_MAVLINK_TARGETING:      // Load neutral position and start MAVLink Roll,Pitch,Yaw control with stabilization
-        set_control_angles(packet.input_b*0.01f, packet.input_a*0.01f, packet.input_c*0.01f);
+        set_control_angles(packet.input_b*0.01, packet.input_a*0.01, packet.input_c*0.01);
         break;
 
     case MAV_MOUNT_MODE_RC_TARGETING:      // Load neutral position and start RC Roll,Pitch,Yaw control with stabilization
@@ -533,7 +490,7 @@ void AP_Mount::status_msg(mavlink_message_t *msg)
 }
 
 /// Set mount point/region of interest, triggered by mission script commands
-void AP_Mount::set_roi_cmd(const struct Location *target_loc)
+void AP_Mount::set_roi_cmd(struct Location *target_loc)
 {
 #if MNT_GPSPOINT_OPTION == ENABLED
     // set the target gps location
@@ -567,19 +524,19 @@ AP_Mount::angle_input(RC_Channel* rc, int16_t angle_min, int16_t angle_max)
 float
 AP_Mount::angle_input_rad(RC_Channel* rc, int16_t angle_min, int16_t angle_max)
 {
-    return radians(angle_input(rc, angle_min, angle_max)*0.01f);
+    return radians(angle_input(rc, angle_min, angle_max)*0.01);
 }
 
 void
-AP_Mount::calc_GPS_target_angle(const struct Location *target)
+AP_Mount::calc_GPS_target_angle(struct Location *target)
 {
-    float GPS_vector_x = (target->lng-_current_loc->lng)*cosf(ToRad((_current_loc->lat+target->lat)*0.00000005f))*0.01113195f;
-    float GPS_vector_y = (target->lat-_current_loc->lat)*0.01113195f;
+    float GPS_vector_x = (target->lng-_current_loc->lng)*cos(ToRad((_current_loc->lat+target->lat)*.00000005))*.01113195;
+    float GPS_vector_y = (target->lat-_current_loc->lat)*.01113195;
     float GPS_vector_z = (target->alt-_current_loc->alt);                 // baro altitude(IN CM) should be adjusted to known home elevation before take off (Set altimeter).
-    float target_distance = 100.0f*pythagorous2(GPS_vector_x, GPS_vector_y);      // Careful , centimeters here locally. Baro/alt is in cm, lat/lon is in meters.
+    float target_distance = 100.0*sqrt(GPS_vector_x*GPS_vector_x + GPS_vector_y*GPS_vector_y);      // Careful , centimeters here locally. Baro/alt is in cm, lat/lon is in meters.
     _roll_control_angle  = 0;
-    _tilt_control_angle  = atan2f(GPS_vector_z, target_distance);
-    _pan_control_angle   = atan2f(GPS_vector_x, GPS_vector_y);
+    _tilt_control_angle  = atan2(GPS_vector_z, target_distance);
+    _pan_control_angle   = atan2(GPS_vector_x, GPS_vector_y);
 }
 
 /// Stabilizes mount relative to the Earth's frame

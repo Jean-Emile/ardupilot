@@ -27,7 +27,7 @@ static void init_commands()
 static struct Location get_cmd_with_index(int i)
 {
 	struct Location temp;
-	uint16_t mem;
+	long mem;
 
 	// Find out proper location in memory by using the start_byte position + the index
 	// --------------------------------------------------------------------------------
@@ -37,22 +37,22 @@ static struct Location get_cmd_with_index(int i)
 	}else{
 		// read WP position
 		mem = (WP_START_BYTE) + (i * WP_SIZE);
-		temp.id = hal.storage->read_byte(mem);
+		temp.id = eeprom_read_byte((uint8_t*)mem);
 
 		mem++;
-		temp.options = hal.storage->read_byte(mem);
+		temp.options = eeprom_read_byte((uint8_t*)mem);
 
 		mem++;
-		temp.p1 = hal.storage->read_byte(mem);
+		temp.p1 = eeprom_read_byte((uint8_t*)mem);
 
 		mem++;
-		temp.alt = (long)hal.storage->read_dword(mem);
+		temp.alt = (long)eeprom_read_dword((uint32_t*)mem);
 
 		mem += 4;
-		temp.lat = (long)hal.storage->read_dword(mem);
+		temp.lat = (long)eeprom_read_dword((uint32_t*)mem);
 
 		mem += 4;
-		temp.lng = (long)hal.storage->read_dword(mem);
+		temp.lng = (long)eeprom_read_dword((uint32_t*)mem);
 	}
 
 	// Add on home altitude if we are a nav command (or other command with altitude) and stored alt is relative
@@ -67,40 +67,40 @@ static struct Location get_cmd_with_index(int i)
 // -------
 static void set_cmd_with_index(struct Location temp, int i)
 {
-	i = constrain_int16(i, 0, g.command_total.get());
-	uint16_t mem = WP_START_BYTE + (i * WP_SIZE);
+	i = constrain(i, 0, g.command_total.get());
+	intptr_t mem = WP_START_BYTE + (i * WP_SIZE);
 
 	// Set altitude options bitmask
 	// XXX What is this trying to do?
-	if ((temp.options & MASK_OPTIONS_RELATIVE_ALT) && i != 0){
+	if (temp.options & MASK_OPTIONS_RELATIVE_ALT && i != 0){
 		temp.options = MASK_OPTIONS_RELATIVE_ALT;
 	} else {
 		temp.options = 0;
 	}
 
-	hal.storage->write_byte(mem, temp.id);
+	eeprom_write_byte((uint8_t *)	mem, temp.id);
 
-    mem++;
-	hal.storage->write_byte(mem, temp.options);
-
-	mem++;
-	hal.storage->write_byte(mem, temp.p1);
+        mem++;
+	eeprom_write_byte((uint8_t *)	mem, temp.options);
 
 	mem++;
-	hal.storage->write_dword(mem, temp.alt);
+	eeprom_write_byte((uint8_t *)	mem, temp.p1);
+
+	mem++;
+	eeprom_write_dword((uint32_t *)	mem, temp.alt);
 
 	mem += 4;
-	hal.storage->write_dword(mem, temp.lat);
+	eeprom_write_dword((uint32_t *)	mem, temp.lat);
 
 	mem += 4;
-	hal.storage->write_dword(mem, temp.lng);
+	eeprom_write_dword((uint32_t *)	mem, temp.lng);
 }
 
 /*
 This function stores waypoint commands
 It looks to see what the next command type is and finds the last command.
 */
-static void set_next_WP(const struct Location *wp)
+static void set_next_WP(struct Location *wp)
 {
 	// copy the current WP into the OldWP slot
 	// ---------------------------------------
@@ -185,8 +185,7 @@ void init_home()
 
 static void restart_nav()
 {  
-    g.pidNavSteer.reset_I();
-    g.pidSpeedThrottle.reset_I();
+    reset_I();
     prev_WP = current_loc;
     nav_command_ID = NO_COMMAND;
     nav_command_index = 0;

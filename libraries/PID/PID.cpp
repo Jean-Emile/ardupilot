@@ -6,10 +6,6 @@
 #include <math.h>
 
 #include "PID.h"
-#include <AP_HAL.h>
-#include <AP_Math.h>
-
-extern const AP_HAL::HAL& hal;
 
 const AP_Param::GroupInfo PID::var_info[] PROGMEM = {
     AP_GROUPINFO("P",    0, PID, _kp, 0),
@@ -19,9 +15,10 @@ const AP_Param::GroupInfo PID::var_info[] PROGMEM = {
     AP_GROUPEND
 };
 
-float PID::get_pid(float error, float scaler)
+int32_t
+PID::get_pid(int32_t error, float scaler)
 {
-    uint32_t tnow = hal.scheduler->millis();
+    uint32_t tnow = millis();
     uint32_t dt = tnow - _last_t;
     float output            = 0;
     float delta_time;
@@ -37,13 +34,13 @@ float PID::get_pid(float error, float scaler)
     }
     _last_t = tnow;
 
-    delta_time = (float)dt / 1000.0f;
+    delta_time = (float)dt / 1000.0;
 
     // Compute proportional component
     output += error * _kp;
 
     // Compute derivative component if time has elapsed
-    if ((fabsf(_kd) > 0) && (dt > 0)) {
+    if ((fabs(_kd) > 0) && (dt > 0)) {
         float derivative;
 
 		if (isnan(_last_derivative)) {
@@ -58,10 +55,9 @@ float PID::get_pid(float error, float scaler)
 
         // discrete low pass filter, cuts out the
         // high frequency noise that can drive the controller crazy
-        float RC = 1/(2*PI*_fCut);
+        float RC = 1/(2*M_PI*_fCut);
         derivative = _last_derivative +
-                     ((delta_time / (RC + delta_time)) *
-                      (derivative - _last_derivative));
+                     (delta_time / (RC + delta_time)) * (derivative - _last_derivative);
 
         // update state
         _last_error             = error;
@@ -75,7 +71,7 @@ float PID::get_pid(float error, float scaler)
     output *= scaler;
 
     // Compute integral component if time has elapsed
-    if ((fabsf(_ki) > 0) && (dt > 0)) {
+    if ((fabs(_ki) > 0) && (dt > 0)) {
         _integrator             += (error * _ki) * scaler * delta_time;
         if (_integrator < -_imax) {
             _integrator = -_imax;
@@ -86,12 +82,6 @@ float PID::get_pid(float error, float scaler)
     }
 
     return output;
-}
-
-int16_t PID::get_pid_4500(float error, float scaler)
-{
-	float v = get_pid(error, scaler);
-	return constrain(v, -4500, 4500);
 }
 
 void

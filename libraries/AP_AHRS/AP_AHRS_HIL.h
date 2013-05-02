@@ -1,35 +1,36 @@
-#ifndef __AP_AHRS_HIL_H__
-#define __AP_AHRS_HIL_H__
+#ifndef AP_AHRS_HIL_H
+#define AP_AHRS_HIL_H
 
 class AP_AHRS_HIL : public AP_AHRS
 {
 public:
     // Constructors
-    AP_AHRS_HIL(AP_InertialSensor *ins, GPS *&gps) : 
-	    AP_AHRS(ins, gps),
-	    _drift()
-		{}
+    AP_AHRS_HIL(AP_InertialSensor *ins, GPS *&gps) : AP_AHRS(ins, gps)
+    {
+    }
 
     // Accessors
-    const Vector3f get_gyro(void) const {
+    Vector3f get_gyro(void) {
         return _omega;
     }
 
-    const Matrix3f &get_dcm_matrix(void) const {
-	    return _dcm_matrix;
+    Matrix3f get_dcm_matrix(void) {
+        Matrix3f m;
+        m.from_euler(roll, pitch, yaw);
+        return m;
     }
 
     // Methods
-    void update(void) {
+    void            update(void) {
         _ins->update();
     }
     
-    void setHil(float roll, float pitch, float yaw,
-                float rollRate, float pitchRate, float yawRate);
+    void            setHil(float roll, float pitch, float yaw,
+                           float rollRate, float pitchRate, float yawRate);
 
     // return the current estimate of the gyro drift
-    const Vector3f &get_gyro_drift(void) const {
-	   return  _drift;
+    Vector3f get_gyro_drift(void) {
+        return Vector3f(0,0,0);
     }
 
     // reset the current attitude, used on new IMU calibration
@@ -45,8 +46,6 @@ public:
 
 private:
     Vector3f _omega;
-    Matrix3f _dcm_matrix;
-    Vector3f _drift;
 };
 
-#endif // __AP_AHRS_HIL_H__
+#endif

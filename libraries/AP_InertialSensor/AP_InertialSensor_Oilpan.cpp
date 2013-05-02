@@ -1,7 +1,5 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
-#include <AP_HAL.h>
-#if CONFIG_HAL_BOARD == HAL_BOARD_APM1
 #include "AP_InertialSensor_Oilpan.h"
 
 // ADC channel mappings on for the APM Oilpan
@@ -24,29 +22,28 @@ const float AP_InertialSensor_Oilpan::_adc_constraint = 900;
 // Tested value : 418
 
 // Oilpan accelerometer scaling & offsets
-#define OILPAN_ACCEL_SCALE_1G   (GRAVITY_MSS * 2.0f / (2465.0f - 1617.0f))
-#define OILPAN_RAW_ACCEL_OFFSET ((2465.0f + 1617.0f) * 0.5f)
-#define OILPAN_RAW_GYRO_OFFSET  1658.0f
+#define OILPAN_ACCEL_SCALE_1G   (GRAVITY * 2.0 / (2465.0 - 1617.0))
+#define OILPAN_RAW_ACCEL_OFFSET ((2465.0 + 1617.0) * 0.5)
+#define OILPAN_RAW_GYRO_OFFSET  1658.0
 
-#define ToRad(x) radians(x)      // *pi/180
+#define ToRad(x) (x*0.01745329252)  // *pi/180
 // IDG500 Sensitivity (from datasheet) => 2.0mV/degree/s,
 // 0.8mV/ADC step => 0.8/3.33 = 0.4
 // Tested values : 0.4026, ?, 0.4192
-const float AP_InertialSensor_Oilpan::_gyro_gain_x = ToRad(0.4f);
-const float AP_InertialSensor_Oilpan::_gyro_gain_y = ToRad(0.41f);
-const float AP_InertialSensor_Oilpan::_gyro_gain_z = ToRad(0.41f);
+const float AP_InertialSensor_Oilpan::_gyro_gain_x = ToRad(0.4);
+const float AP_InertialSensor_Oilpan::_gyro_gain_y = ToRad(0.41);
+const float AP_InertialSensor_Oilpan::_gyro_gain_z = ToRad(0.41);
 
 /* ------ Public functions -------------------------------------------*/
 
-AP_InertialSensor_Oilpan::AP_InertialSensor_Oilpan( AP_ADC * adc ) : 
-    AP_InertialSensor(),
+AP_InertialSensor_Oilpan::AP_InertialSensor_Oilpan( AP_ADC * adc ) :
     _adc(adc)
 {
 }
 
-uint16_t AP_InertialSensor_Oilpan::_init_sensor( Sample_rate sample_rate)
+uint16_t AP_InertialSensor_Oilpan::_init_sensor( AP_PeriodicProcess * scheduler, Sample_rate sample_rate)
 {
-    _adc->Init();
+    _adc->Init(scheduler);
 
     switch (sample_rate) {
     case RATE_50HZ:
@@ -60,7 +57,7 @@ uint16_t AP_InertialSensor_Oilpan::_init_sensor( Sample_rate sample_rate)
         break;
     }
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL
+#if defined(DESKTOP_BUILD)
     return AP_PRODUCT_ID_SITL;
 #elif defined(__AVR_ATmega1280__)
     return AP_PRODUCT_ID_APM1_1280;
@@ -80,23 +77,14 @@ bool AP_InertialSensor_Oilpan::update()
     _delta_time_micros = _adc->Ch6(_sensors, adc_values);
     _temp = _adc->Ch(_gyro_temp_ch);
 
-    _gyro   = Vector3f(_sensor_signs[0] * ( adc_values[0] - OILPAN_RAW_GYRO_OFFSET ),
-                       _sensor_signs[1] * ( adc_values[1] - OILPAN_RAW_GYRO_OFFSET ),
-                       _sensor_signs[2] * ( adc_values[2] - OILPAN_RAW_GYRO_OFFSET ));
-    _gyro.rotate(_board_orientation);
-    _gyro.x *= _gyro_gain_x;
-    _gyro.y *= _gyro_gain_y;
-    _gyro.z *= _gyro_gain_z;
+    _gyro.x = _gyro_gain_x * _sensor_signs[0] * ( adc_values[0] - OILPAN_RAW_GYRO_OFFSET );
+    _gyro.y = _gyro_gain_y * _sensor_signs[1] * ( adc_values[1] - OILPAN_RAW_GYRO_OFFSET );
+    _gyro.z = _gyro_gain_z * _sensor_signs[2] * ( adc_values[2] - OILPAN_RAW_GYRO_OFFSET );
     _gyro -= gyro_offset;
 
-    _accel  = Vector3f(_sensor_signs[3] * (adc_values[3] - OILPAN_RAW_ACCEL_OFFSET),
-                       _sensor_signs[4] * (adc_values[4] - OILPAN_RAW_ACCEL_OFFSET),
-                       _sensor_signs[5] * (adc_values[5] - OILPAN_RAW_ACCEL_OFFSET));
-    _accel.rotate(_board_orientation);
-    _accel.x *= accel_scale.x;
-    _accel.y *= accel_scale.y;
-    _accel.z *= accel_scale.z;
-    _accel   *= OILPAN_ACCEL_SCALE_1G;
+    _accel.x = accel_scale.x * _sensor_signs[3] * (adc_values[3] - OILPAN_RAW_ACCEL_OFFSET) * OILPAN_ACCEL_SCALE_1G;
+    _accel.y = accel_scale.y * _sensor_signs[4] * (adc_values[4] - OILPAN_RAW_ACCEL_OFFSET) * OILPAN_ACCEL_SCALE_1G;
+    _accel.z = accel_scale.z * _sensor_signs[5] * (adc_values[5] - OILPAN_RAW_ACCEL_OFFSET) * OILPAN_ACCEL_SCALE_1G;
     _accel -= accel_offset;
 
 /*
@@ -108,8 +96,17 @@ bool AP_InertialSensor_Oilpan::update()
     return true;
 }
 
-float AP_InertialSensor_Oilpan::get_delta_time() {
-    return _delta_time_micros * 1.0e-6;
+bool AP_InertialSensor_Oilpan::new_data_available( void )
+{
+    return _adc->new_data_available(_sensors);
+}
+
+float AP_InertialSensor_Oilpan::temperature() {
+    return _temp;
+}
+
+uint32_t AP_InertialSensor_Oilpan::get_delta_time_micros() {
+    return _delta_time_micros;
 }
 
 /* ------ Private functions -------------------------------------------*/
@@ -126,5 +123,3 @@ uint16_t AP_InertialSensor_Oilpan::num_samples_available()
 {
     return _adc->num_samples_available(_sensors) / _sample_threshold;
 }
-#endif // CONFIG_HAL_BOARD
-

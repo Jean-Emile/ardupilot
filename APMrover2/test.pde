@@ -16,13 +16,15 @@ static int8_t	test_ins(uint8_t argc, 			const Menu::arg *argv);
 static int8_t	test_battery(uint8_t argc, 		const Menu::arg *argv);
 static int8_t	test_relay(uint8_t argc,	 	const Menu::arg *argv);
 static int8_t	test_wp(uint8_t argc, 			const Menu::arg *argv);
+#if CONFIG_SONAR == ENABLED
 static int8_t	test_sonar(uint8_t argc, 	const Menu::arg *argv);
+#endif
 static int8_t	test_mag(uint8_t argc, 			const Menu::arg *argv);
+static int8_t	test_xbee(uint8_t argc, 		const Menu::arg *argv);
+static int8_t	test_eedump(uint8_t argc, 		const Menu::arg *argv);
+static int8_t	test_rawgps(uint8_t argc, 			const Menu::arg *argv);
 static int8_t	test_modeswitch(uint8_t argc, 		const Menu::arg *argv);
 static int8_t	test_logging(uint8_t argc, 		const Menu::arg *argv);
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
-static int8_t   test_shell(uint8_t argc,              const Menu::arg *argv);
-#endif
 
 // Creates a constant array of structs representing menu options
 // and stores them in Flash memory, not RAM.
@@ -36,6 +38,8 @@ static const struct Menu::command test_menu_commands[] PROGMEM = {
 	{"battery",	test_battery},
 	{"relay",			test_relay},
 	{"waypoints",		test_wp},
+	{"xbee",			test_xbee},
+	{"eedump",			test_eedump},
 	{"modeswitch",		test_modeswitch},
 
 	// Tests below here are for hardware sensors only present
@@ -45,8 +49,11 @@ static const struct Menu::command test_menu_commands[] PROGMEM = {
 	{"adc", 		test_adc},
 #endif
 	{"gps",			test_gps},
+	{"rawgps",		test_rawgps},
 	{"ins",			test_ins},
+#if CONFIG_SONAR == ENABLED
 	{"sonartest",	test_sonar},
+#endif
 	{"compass",		test_mag},
 #elif HIL_MODE == HIL_MODE_SENSORS
 	{"adc", 		test_adc},
@@ -56,9 +63,7 @@ static const struct Menu::command test_menu_commands[] PROGMEM = {
 #elif HIL_MODE == HIL_MODE_ATTITUDE
 #endif
 	{"logging",		test_logging},
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
-    {"shell", 				test_shell},
-#endif
+
 };
 
 // A Macro to create the Menu
@@ -78,6 +83,21 @@ static void print_hit_enter()
 }
 
 static int8_t
+test_eedump(uint8_t argc, const Menu::arg *argv)
+{
+	intptr_t i, j;
+
+	// hexdump the EEPROM
+	for (i = 0; i < EEPROM_MAX_ADDR; i += 16) {
+		cliSerial->printf_P(PSTR("%04x:"), i);
+		for (j = 0; j < 16; j++)
+			cliSerial->printf_P(PSTR(" %02x"), eeprom_read_byte((const uint8_t *)(i + j)));
+		cliSerial->println();
+	}
+	return(0);
+}
+
+static int8_t
 test_radio_pwm(uint8_t argc, const Menu::arg *argv)
 {
 	print_hit_enter();
@@ -91,10 +111,10 @@ test_radio_pwm(uint8_t argc, const Menu::arg *argv)
 		read_radio();
 
 		cliSerial->printf_P(PSTR("IN:\t1: %d\t2: %d\t3: %d\t4: %d\t5: %d\t6: %d\t7: %d\t8: %d\n"),
-							g.channel_steer.radio_in,
-							g.rc_2.radio_in,
+							g.channel_roll.radio_in,
+							g.channel_pitch.radio_in,
 							g.channel_throttle.radio_in,
-							g.rc_4.radio_in,
+							g.channel_rudder.radio_in,
 							g.rc_5.radio_in,
 							g.rc_6.radio_in,
 							g.rc_7.radio_in,
@@ -117,12 +137,12 @@ test_passthru(uint8_t argc, const Menu::arg *argv)
 		delay(20);
 
         // New radio frame? (we could use also if((millis()- timer) > 20)
-        if (hal.rcin->valid_channels() > 0) {
+        if (APM_RC.GetState() == 1){
             cliSerial->print("CH:");
             for(int i = 0; i < 8; i++){
-                cliSerial->print(hal.rcin->read(i));	// Print channel values
+                cliSerial->print(APM_RC.InputCh(i));	// Print channel values
                 cliSerial->print(",");
-                hal.rcout->write(i, hal.rcin->read(i)); // Copy input to Servos
+                APM_RC.OutputCh(i, APM_RC.InputCh(i)); // Copy input to Servos
             }
             cliSerial->println();
         }
@@ -147,20 +167,22 @@ test_radio(uint8_t argc, const Menu::arg *argv)
 		delay(20);
 		read_radio();
 
-		g.channel_steer.calc_pwm();
+		g.channel_roll.calc_pwm();
+		g.channel_pitch.calc_pwm();
 		g.channel_throttle.calc_pwm();
+		g.channel_rudder.calc_pwm();
 
 		// write out the servo PWM values
 		// ------------------------------
 		set_servos();
 
-        tuning_value = constrain(((float)(g.rc_7.radio_in - g.rc_7.radio_min) / (float)(g.rc_7.radio_max - g.rc_7.radio_min)),0,1);
+                tuning_value = constrain(((float)(g.rc_7.radio_in - g.rc_7.radio_min) / (float)(g.rc_7.radio_max - g.rc_7.radio_min)),0,1);
                 
 		cliSerial->printf_P(PSTR("IN 1: %d\t2: %d\t3: %d\t4: %d\t5: %d\t6: %d\t7: %d\t8: %d  Tuning = %2.3f\n"),
-							g.channel_steer.control_in,
-							g.rc_2.control_in,
+							g.channel_roll.control_in,
+							g.channel_pitch.control_in,
 							g.channel_throttle.control_in,
-							g.rc_4.control_in,
+							g.channel_rudder.control_in,
 							g.rc_5.control_in,
 							g.rc_6.control_in,
 							g.rc_7.control_in,
@@ -176,7 +198,7 @@ test_radio(uint8_t argc, const Menu::arg *argv)
 static int8_t
 test_failsafe(uint8_t argc, const Menu::arg *argv)
 {
-	uint8_t fail_test;
+	byte fail_test;
 	print_hit_enter();
 	for(int i = 0; i < 50; i++){
 		delay(20);
@@ -206,15 +228,13 @@ test_failsafe(uint8_t argc, const Menu::arg *argv)
 
 		if (oldSwitchPosition != readSwitch()){
 			cliSerial->printf_P(PSTR("CONTROL MODE CHANGED: "));
-            print_mode(cliSerial, readSwitch());
-            cliSerial->println();
+            print_flight_mode(readSwitch());
 			fail_test++;
 		}
 
-		if (g.fs_throttle_enabled && g.channel_throttle.get_failsafe()){
+		if(g.throttle_fs_enabled && g.channel_throttle.get_failsafe()){
 			cliSerial->printf_P(PSTR("THROTTLE FAILSAFE ACTIVATED: %d, "), g.channel_throttle.radio_in);
-            print_mode(cliSerial, readSwitch());
-            cliSerial->println();
+            print_flight_mode(readSwitch());
 			fail_test++;
 		}
 
@@ -294,10 +314,10 @@ test_wp(uint8_t argc, const Menu::arg *argv)
 {
 	delay(1000);
 
-	cliSerial->printf_P(PSTR("%u waypoints\n"), (unsigned)g.command_total);
-	cliSerial->printf_P(PSTR("Hit radius: %f\n"), g.waypoint_radius);
+	cliSerial->printf_P(PSTR("%d waypoints\n"), (int)g.command_total);
+	cliSerial->printf_P(PSTR("Hit radius: %d\n"), (int)g.waypoint_radius);
 
-	for(uint8_t i = 0; i <= g.command_total; i++){
+	for(byte i = 0; i <= g.command_total; i++){
 		struct Location temp = get_cmd_with_index(i);
 		test_wp_print(&temp, i);
 	}
@@ -306,7 +326,7 @@ test_wp(uint8_t argc, const Menu::arg *argv)
 }
 
 static void
-test_wp_print(const struct Location *cmd, uint8_t wp_index)
+test_wp_print(struct Location *cmd, byte wp_index)
 {
 	cliSerial->printf_P(PSTR("command #: %d id:%d options:%d p1:%d p2:%ld p3:%ld p4:%ld \n"),
 		(int)wp_index,
@@ -319,6 +339,25 @@ test_wp_print(const struct Location *cmd, uint8_t wp_index)
 }
 
 static int8_t
+test_xbee(uint8_t argc, const Menu::arg *argv)
+{
+	print_hit_enter();
+	delay(1000);
+	cliSerial->printf_P(PSTR("Begin XBee X-CTU Range and RSSI Test:\n"));
+
+	while(1){
+
+	    if (Serial3.available())
+   			Serial3.write(Serial3.read());
+
+		if(cliSerial->available() > 0){
+			return (0);
+		}
+	}
+}
+
+
+static int8_t
 test_modeswitch(uint8_t argc, const Menu::arg *argv)
 {
 	print_hit_enter();
@@ -326,11 +365,11 @@ test_modeswitch(uint8_t argc, const Menu::arg *argv)
 
 	cliSerial->printf_P(PSTR("Control CH "));
 
-	cliSerial->println(MODE_CHANNEL, DEC);
+	cliSerial->println(FLIGHT_MODE_CHANNEL, DEC);
 
 	while(1){
 		delay(20);
-		uint8_t switchPosition = readSwitch();
+		byte switchPosition = readSwitch();
 		if (oldSwitchPosition != switchPosition){
 			cliSerial->printf_P(PSTR("Position %d\n"),  switchPosition);
 			oldSwitchPosition = switchPosition;
@@ -348,7 +387,20 @@ static int8_t
 test_logging(uint8_t argc, const Menu::arg *argv)
 {
 	cliSerial->println_P(PSTR("Testing dataflash logging"));
-    DataFlash.ShowDeviceInfo(cliSerial);
+    if (!DataFlash.CardInserted()) {
+        cliSerial->println_P(PSTR("ERR: No dataflash inserted"));
+        return 0;
+    }
+    DataFlash.ReadManufacturerID();
+    cliSerial->printf_P(PSTR("Manufacturer: 0x%02x   Device: 0x%04x\n"),
+                    (unsigned)DataFlash.df_manufacturer,
+                    (unsigned)DataFlash.df_device);
+    cliSerial->printf_P(PSTR("NumPages: %u  PageSize: %u\n"),
+                    (unsigned)DataFlash.df_NumPages+1,
+                    (unsigned)DataFlash.df_PageSize);
+    DataFlash.StartRead(DataFlash.df_NumPages+1);
+    cliSerial->printf_P(PSTR("Format version: %lx  Expected format version: %lx\n"),
+                    (unsigned long)DataFlash.ReadLong(), (unsigned long)DF_LOGGING_FORMAT);
     return 0;
 }
 
@@ -363,7 +415,7 @@ static int8_t
 test_adc(uint8_t argc, const Menu::arg *argv)
 {
 	print_hit_enter();
-	adc.Init();
+	adc.Init(&timer_scheduler);
 	delay(1000);
 	cliSerial->printf_P(PSTR("ADC\n"));
 	delay(1000);
@@ -386,7 +438,7 @@ test_gps(uint8_t argc, const Menu::arg *argv)
 	delay(1000);
 
 	while(1){
-		delay(100);
+		delay(333);
 
 		// Blink GPS LED if we don't have a fix
 		// ------------------------------------
@@ -413,11 +465,9 @@ static int8_t
 test_ins(uint8_t argc, const Menu::arg *argv)
 {
 	//cliSerial->printf_P(PSTR("Calibrating."));
-	ahrs.init();
-    ahrs.set_fly_forward(true);
 	ins.init(AP_InertialSensor::COLD_START, 
              ins_sample_rate, 
-             flash_leds);
+             delay, flash_leds, &timer_scheduler);
     ahrs.reset();
 
 	print_hit_enter();
@@ -474,15 +524,13 @@ test_mag(uint8_t argc, const Menu::arg *argv)
         cliSerial->println_P(PSTR("Compass initialisation failed!"));
         return 0;
     }
-    ahrs.init();
-    ahrs.set_fly_forward(true);
     ahrs.set_compass(&compass);
     report_compass();
 
     // we need the AHRS initialised for this test
 	ins.init(AP_InertialSensor::COLD_START, 
              ins_sample_rate, 
-             flash_leds);
+             delay, flash_leds, &timer_scheduler);
     ahrs.reset();
 
 	int counter = 0;
@@ -519,7 +567,7 @@ test_mag(uint8_t argc, const Menu::arg *argv)
                 if (compass.healthy) {
                     Vector3f maggy = compass.get_offsets();
                     cliSerial->printf_P(PSTR("Heading: %ld, XYZ: %d, %d, %d,\tXYZoff: %6.2f, %6.2f, %6.2f\n"),
-                                    (wrap_360_cd(ToDeg(heading) * 100)) /100,
+                                    (wrap_360(ToDeg(heading) * 100)) /100,
                                     (int)compass.mag_x,
                                     (int)compass.mag_y,
                                     (int)compass.mag_z,
@@ -549,83 +597,54 @@ test_mag(uint8_t argc, const Menu::arg *argv)
 //-------------------------------------------------------------------------------------------
 // real sensors that have not been simulated yet go here
 
+#if HIL_MODE == HIL_MODE_DISABLED
+
+static int8_t
+test_rawgps(uint8_t argc, const Menu::arg *argv)
+{
+  print_hit_enter();
+	delay(1000);
+
+	while(1){
+		if (Serial3.available()){
+			digitalWrite(B_LED_PIN, LED_ON); 		// Blink Yellow LED if we are sending data to GPS
+			Serial1.write(Serial3.read());
+			digitalWrite(B_LED_PIN, LED_OFF);
+		}
+		if (Serial1.available()){
+			digitalWrite(C_LED_PIN, LED_ON);		// Blink Red LED if we are receiving data from GPS
+			Serial3.write(Serial1.read());
+			digitalWrite(C_LED_PIN, LED_OFF);
+		}
+		if(cliSerial->available() > 0){
+			return (0);
+		}
+  }
+}
+
+#if CONFIG_SONAR == ENABLED
 static int8_t
 test_sonar(uint8_t argc, const Menu::arg *argv)
 {
-    if (!sonar.enabled()) {
-        cliSerial->println_P(PSTR("WARNING: Sonar is not enabled"));
-    }
+  print_hit_enter();
+	delay(1000);
+	init_sonar();
+	delay(1000);
 
-    print_hit_enter();
-    init_sonar();
-    
-    float sonar_dist_cm_min = 0.0f;
-    float sonar_dist_cm_max = 0.0f;
-    float voltage_min=0.0f, voltage_max = 0.0f;
-    float sonar2_dist_cm_min = 0.0f;
-    float sonar2_dist_cm_max = 0.0f;
-    float voltage2_min=0.0f, voltage2_max = 0.0f;
-    uint32_t last_print = 0;
+	while(1){
+	  delay(20);
+	  if(g.sonar_enabled){
+		sonar_dist = sonar.read();
+	  }
+    	  cliSerial->printf_P(PSTR("sonar_dist = %d\n"), (int)sonar_dist);
 
-	while (true) {
-        delay(20);
-        uint32_t now = millis();
-
-        float dist_cm = sonar.distance_cm();
-        float voltage = sonar.voltage();
-        if (sonar_dist_cm_min == 0.0f) {
-            sonar_dist_cm_min = dist_cm;
-            voltage_min = voltage;
-        }
-        sonar_dist_cm_max = max(sonar_dist_cm_max, dist_cm);
-        sonar_dist_cm_min = min(sonar_dist_cm_min, dist_cm);
-        voltage_min = min(voltage_min, voltage);
-        voltage_max = max(voltage_max, voltage);
-
-        dist_cm = sonar2.distance_cm();
-        voltage = sonar2.voltage();
-        if (sonar2_dist_cm_min == 0.0f) {
-            sonar2_dist_cm_min = dist_cm;
-            voltage2_min = voltage;
-        }
-        sonar2_dist_cm_max = max(sonar2_dist_cm_max, dist_cm);
-        sonar2_dist_cm_min = min(sonar2_dist_cm_min, dist_cm);
-        voltage2_min = min(voltage2_min, voltage);
-        voltage2_max = max(voltage2_max, voltage);
-
-        if (now - last_print >= 200) {
-            cliSerial->printf_P(PSTR("sonar1 dist=%.1f:%.1fcm volt1=%.2f:%.2f   sonar2 dist=%.1f:%.1fcm volt2=%.2f:%.2f\n"), 
-                                sonar_dist_cm_min, 
-                                sonar_dist_cm_max, 
-                                voltage_min,
-                                voltage_max,
-                                sonar2_dist_cm_min, 
-                                sonar2_dist_cm_max, 
-                                voltage2_min,
-                                voltage2_max);
-            voltage_min = voltage_max = 0.0f;
-            voltage2_min = voltage2_max = 0.0f;
-            sonar_dist_cm_min = sonar_dist_cm_max = 0.0f;
-            sonar2_dist_cm_min = sonar2_dist_cm_max = 0.0f;
-            last_print = now;
-        }
-        if (cliSerial->available() > 0) {
-            break;
+          if(cliSerial->available() > 0){
+  		break;
 	    }
-    }
-    return (0);
+  }
+  return (0);
 }
-
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
-/*
- *  run a debug shell
- */
-static int8_t
-test_shell(uint8_t argc, const Menu::arg *argv)
-{
-    hal.util->run_debug_shell(cliSerial);
-    return 0;
-}
-#endif
+#endif // SONAR == ENABLED
+#endif // HIL_MODE == HIL_MODE_DISABLED
 
 #endif // CLI_ENABLED

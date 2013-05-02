@@ -3,7 +3,7 @@
 static void read_control_switch()
 {
 	
-	uint8_t switchPosition = readSwitch();
+	byte switchPosition = readSwitch();
 	
 	// If switchPosition = 255 this indicates that the mode control channel input was out of range
 	// If we get this value we do not want to change modes.
@@ -17,23 +17,23 @@ static void read_control_switch()
     // as a spring loaded trainer switch).
 	if (oldSwitchPosition != switchPosition ||
         (g.reset_switch_chan != 0 && 
-         hal.rcin->read(g.reset_switch_chan-1) > RESET_SWITCH_CHAN_PWM)) {
+         APM_RC.InputCh(g.reset_switch_chan-1) > RESET_SWITCH_CHAN_PWM)) {
 
-		set_mode((enum mode)modes[switchPosition].get());
+		set_mode(flight_modes[switchPosition]);
 
 		oldSwitchPosition = switchPosition;
 		prev_WP = current_loc;
 
-		// reset navigation and speed integrators
+		// reset navigation integrators
 		// -------------------------
-        g.pidNavSteer.reset_I();
-        g.pidSpeedThrottle.reset_I();
+		reset_I();
+
 	}
 
 }
 
-static uint8_t readSwitch(void){
-    uint16_t pulsewidth = hal.rcin->read(g.mode_channel - 1);
+static byte readSwitch(void){
+	uint16_t pulsewidth = APM_RC.InputCh(g.flight_mode_channel - 1);
 	if (pulsewidth <= 910 || pulsewidth >= 2090) 	return 255;	// This is an error condition
 	if (pulsewidth > 1230 && pulsewidth <= 1360) 	return 1;
 	if (pulsewidth > 1360 && pulsewidth <= 1490) 	return 2;
@@ -55,35 +55,29 @@ static void reset_control_switch()
 // set this to your trainer switch
 static void read_trim_switch()
 {
-    switch ((enum ch7_option)g.ch7_option.get()) {
-    case CH7_DO_NOTHING:
-        break;
-    case CH7_SAVE_WP:
-		if (g.rc_7.radio_in > CH_7_PWM_TRIGGER) {
-            // switch is engaged
-			ch7_flag = true;
+    if (g.ch7_option == CH7_SAVE_WP) {         // set to 1
+		if (g.rc_7.radio_in > CH_7_PWM_TRIGGER){ // switch is engaged
+			trim_flag = true;
 		} else { // switch is disengaged
-			if (ch7_flag) {
-				ch7_flag = false;
+			if(trim_flag) {
+				trim_flag = false;
 
 				if (control_mode == MANUAL) {
-                    hal.console->println_P(PSTR("Erasing waypoints"));
                     // if SW7 is ON in MANUAL = Erase the Flight Plan
+					CH7_wp_index = 0;
 					g.command_total.set_and_save(CH7_wp_index);
                     g.command_total = 0;
                     g.command_index =0;
                     nav_command_index = 0;
-                    if (g.channel_steer.control_in > 3000) {
-						// if roll is full right store the current location as home
-                        init_home();
-                    }
-                    CH7_wp_index = 1;     
+                    if(g.channel_roll.control_in > 3000) // if roll is full right store the current location as home
+                        ground_start_count = 5;
+                    CH7_wp_index = 1;                    
 					return;
-				} else if (control_mode == LEARNING || control_mode == STEERING) {    
+				} else if (control_mode == LEARNING) {    
                     // if SW7 is ON in LEARNING = record the Wp
                     // set the next_WP (home is stored at 0)
-
-                    hal.console->printf_P(PSTR("Learning waypoint %u"), (unsigned)CH7_wp_index);        
+                    CH7_wp_index = constrain(CH7_wp_index, 1, MAX_WAYPOINTS);
+        
                     current_loc.id = MAV_CMD_NAV_WAYPOINT;  
     
                     // store the index
@@ -97,7 +91,6 @@ static void read_trim_switch()
                                   
                     // increment index
                     CH7_wp_index++; 
-                    CH7_wp_index = constrain_int16(CH7_wp_index, 1, MAX_WAYPOINTS);
 
                 } else if (control_mode == AUTO) {    
                     // if SW7 is ON in AUTO = set to RTL  
@@ -105,7 +98,19 @@ static void read_trim_switch()
                 }
             }
         }
-        break;
+    } else if (g.ch7_option == CH7_RTL) {
+        // set to 6
+		if (g.rc_7.radio_in > CH_7_PWM_TRIGGER) {
+            // switch is engaged
+			trim_flag = true;
+		} else { // switch is disengaged
+			if (trim_flag) {
+				trim_flag = false;
+                if (control_mode == LEARNING) {
+                    set_mode(RTL);
+                }
+            }
+        }
     }
 }
 

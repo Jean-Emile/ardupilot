@@ -4,9 +4,13 @@
 // you wish to change any of the setup parameters from their default
 // values, place the appropriate #define statements here.
 
-// If you used to define your CONFIG_APM_HARDWARE setting here, it is no
-// longer valid! You should switch to using CONFIG_HAL_BOARD via the HAL_BOARD
-// flag in your local config.mk instead.
+//#define CONFIG_APM_HARDWARE APM_HARDWARE_APM2
+
+// Ordinary users should please ignore the following define.
+// APM2_BETA_HARDWARE is used to support early (September-October 2011) APM2
+// hardware which had the BMP085 barometer onboard. Only a handful of
+// developers have these boards.
+//#define APM2_BETA_HARDWARE
 
 // The following are the recommended settings for Xplane
 // simulation. Remove the leading "/* and trailing "*/" to enable:
@@ -17,7 +21,9 @@
  *  // HIL_MODE SELECTION
  *  //
  *  // Mavlink supports
+ *  // 1. HIL_MODE_ATTITUDE : simulated position, airspeed, and attitude
  *  // 2. HIL_MODE_SENSORS: full sensor simulation
+ *  //#define HIL_MODE            HIL_MODE_ATTITUDE
  *
  */
 

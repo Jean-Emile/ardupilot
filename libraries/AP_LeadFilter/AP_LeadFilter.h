@@ -1,9 +1,11 @@
 // -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: t -*-
 
-#ifndef __AP_LEADFILTER_H__
-#define __AP_LEADFILTER_H__
+/// @file	RC_Channel.h
+/// @brief	RC_Channel manager, with EEPROM-backed storage of constants.
 
-#include <stdint.h>
+#ifndef AP_LeadFilter_h
+#define AP_LeadFilter_h
+
 #include <AP_LeadFilter.h>
 
 /// @class	AP_LeadFilter
@@ -26,4 +28,4 @@ private:
 
 };
 
-#endif // __AP_LEADFILTER_H__
+#endif

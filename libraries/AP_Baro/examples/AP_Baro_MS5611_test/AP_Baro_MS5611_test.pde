@@ -1,65 +1,64 @@
 
+#include <stdint.h>
+#include <FastSerial.h>
 #include <AP_Common.h>
-#include <AP_Progmem.h>
-#include <AP_Param.h>
-#include <AP_Math.h>
-#include <AP_HAL.h>
-#include <AP_Buffer.h>
+#include <AP_Math.h>            // ArduPilot Mega Vector/Matrix math Library
+#include <I2C.h>
+#include <SPI.h>
 #include <Filter.h>
-#include <AP_Baro.h>
+#include <AP_Buffer.h>
+#include <Arduino_Mega_ISR_Registry.h>
+#include <AP_PeriodicProcess.h>
+#include <AP_Baro.h> // ArduPilot Mega ADC Library
 
-#include <AP_HAL_AVR.h>
-const AP_HAL::HAL& hal = AP_HAL_BOARD_DRIVER;
+FastSerialPort0(Serial);
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_APM2
+AP_Baro_MS5611 baro;
+Arduino_Mega_ISR_Registry isr_registry;
+AP_TimerProcess scheduler;
 
-AP_Baro_MS5611 baro(&AP_Baro_MS5611::spi);
-static uint32_t timer;
+unsigned long timer;
 
 void setup()
 {
-    hal.console->println("APM2 MS5611 Barometer library test");
+    Serial.begin(115200, 128, 128);
+    Serial.println("ArduPilot Mega MeasSense Barometer library test");
 
-    hal.scheduler->delay(1000);
+    delay(1000);
 
-    /* What's this for? */
-    hal.gpio->pinMode(63, GPIO_OUTPUT);
-    hal.gpio->write(63, 1);
-    
-    baro.init();
-    baro.calibrate();
+    isr_registry.init();
+    scheduler.init(&isr_registry);
 
-    timer = hal.scheduler->micros();
+    pinMode(63, OUTPUT);
+    digitalWrite(63, HIGH);
+    SPI.begin();
+    SPI.setClockDivider(SPI_CLOCK_DIV32);     // 500khz for debugging, increase later
+
+    baro.init(&scheduler);
+    baro.calibrate(delay);
+    timer = millis();
 }
 
 void loop()
 {
-    if((hal.scheduler->micros() - timer) > 100000UL) {
-        timer = hal.scheduler->micros();
+    if((micros() - timer) > 100000UL) {
+        timer = micros();
         baro.read();
-        uint32_t read_time = hal.scheduler->micros() - timer;
+        uint32_t read_time = micros() - timer;
         if (!baro.healthy) {
-            hal.console->println("not healthy");
+            Serial.println("not healthy");
             return;
         }
-        hal.console->print("Pressure:");
-        hal.console->print(baro.get_pressure());
-        hal.console->print(" Temperature:");
-        hal.console->print(baro.get_temperature());
-        hal.console->print(" Altitude:");
-        hal.console->print(baro.get_altitude());
-        hal.console->printf(" climb=%.2f t=%u samples=%u",
+        Serial.print("Pressure:");
+        Serial.print(baro.get_pressure());
+        Serial.print(" Temperature:");
+        Serial.print(baro.get_temperature());
+        Serial.print(" Altitude:");
+        Serial.print(baro.get_altitude());
+        Serial.printf(" climb=%.2f t=%u samples=%u",
                       baro.get_climb_rate(),
                       (unsigned)read_time,
                       (unsigned)baro.get_pressure_samples());
-        hal.console->println();
+        Serial.println();
     }
 }
-
-#else // Non-APM2
-#warning AP_Baro_MS5611_test built as stub for APM1
-void setup () {}
-void loop () {}
-#endif
-
-AP_HAL_MAIN();

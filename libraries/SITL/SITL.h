@@ -8,7 +8,6 @@
 #include <AP_Math.h>
 #include <GCS_MAVLink.h>
 
-#pragma pack(push,1)
 struct sitl_fdm {
 	// this is the packet sent by the simulator
 	// to the APM executable to update the simulator state
@@ -16,32 +15,18 @@ struct sitl_fdm {
 	double latitude, longitude; // degrees
 	double altitude;  // MSL
 	double heading;   // degrees
-	double speedN, speedE, speedD; // m/s
+	double speedN, speedE; // m/s
 	double xAccel, yAccel, zAccel;       // m/s/s in body frame
 	double rollRate, pitchRate, yawRate; // degrees/s/s in earth frame
 	double rollDeg, pitchDeg, yawDeg;    // euler angles, degrees
 	double airspeed; // m/s
-	uint32_t magic; // 0x4c56414f
+	uint32_t magic; // 0x4c56414e
 };
-#pragma pack(pop)
 
 
 class SITL
 {
 public:
-    
-    SITL() {
-        AP_Param::setup_object_defaults(this, var_info);        
-    }
-
-    enum GPSType { 
-        GPS_TYPE_NONE  = 0,
-        GPS_TYPE_UBLOX = 1,
-        GPS_TYPE_MTK   = 2,
-        GPS_TYPE_MTK16 = 3,
-        GPS_TYPE_MTK19 = 4
-    };
-
 	struct sitl_fdm state;
 
 	static const struct AP_Param::GroupInfo var_info[];
@@ -58,8 +43,6 @@ public:
     AP_Float engine_mul;  // engine multiplier
 	AP_Int8  gps_disable; // disable simulated GPS
 	AP_Int8  gps_delay;   // delay in samples
-    AP_Int8  gps_type;    // see enum GPSType
-    AP_Float gps_byteloss;// byte loss as a percent
 
     // wind control
     AP_Float wind_speed;

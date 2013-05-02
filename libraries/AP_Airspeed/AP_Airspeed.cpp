@@ -8,12 +8,9 @@
  *   of the License, or (at your option) any later version.
  */
 
-#include <AP_Math.h>
+#include <FastSerial.h>
 #include <AP_Common.h>
-#include <AP_HAL.h>
 #include <AP_Airspeed.h>
-
-extern const AP_HAL::HAL& hal;
 
 // table of user settable parameters
 const AP_Param::GroupInfo AP_Airspeed::var_info[] PROGMEM = {
@@ -40,34 +37,27 @@ const AP_Param::GroupInfo AP_Airspeed::var_info[] PROGMEM = {
     // @DisplayName: Airspeed ratio
     // @Description: Airspeed calibration ratio
     // @Increment: 0.1
-    AP_GROUPINFO("RATIO",  3, AP_Airspeed, _ratio, 1.9936f),
+    AP_GROUPINFO("RATIO",  3, AP_Airspeed, _ratio, 1.9936),
 
     AP_GROUPEND
 };
 
-/*
-  this scaling factor converts from the old system where we used a 
-  0 to 1023 raw ADC value for 0-5V to the new system which gets the
-  voltage in volts directly from the ADC driver
- */
-#define SCALING_OLD_CALIBRATION 204.8f // 1024/5
-
 // calibrate the airspeed. This must be called at least once before
 // the get_airspeed() interface can be used
-void AP_Airspeed::calibrate()
+void AP_Airspeed::calibrate(void (*callback)(unsigned long t))
 {
     float sum = 0;
     uint8_t c;
     if (!_enable) {
         return;
     }
-    _source->voltage_average();
+    _source->read();
     for (c = 0; c < 10; c++) {
-        hal.scheduler->delay(100);
-        sum += _source->voltage_average() * SCALING_OLD_CALIBRATION;
+        callback(100);
+        sum += _source->read();
     }
-    float raw = sum/c;
-    _offset.set_and_save(raw);
+    _airspeed_raw = sum/c;
+    _offset.set_and_save(_airspeed_raw);
     _airspeed = 0;
 }
 
@@ -78,8 +68,7 @@ void AP_Airspeed::read(void)
     if (!_enable) {
         return;
     }
-    float raw               = _source->voltage_average() * SCALING_OLD_CALIBRATION;
-    airspeed_pressure       = max(raw - _offset, 0);
-    float new_airspeed      = sqrtf(airspeed_pressure * _ratio);
-    _airspeed               = 0.7f * _airspeed  +  0.3f * new_airspeed;
+    _airspeed_raw           = _source->read();
+    airspeed_pressure       = max((_airspeed_raw - _offset), 0);
+    _airspeed               = 0.7 * _airspeed + 0.3 * sqrt(airspeed_pressure * _ratio);
 }

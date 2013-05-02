@@ -11,20 +11,19 @@
 //	GPS configuration : Custom protocol per "DIYDrones Custom Binary Sentence Specification V1.1"
 //
 
+#include "AP_GPS_MTK.h"
 #include <stdint.h>
 
-#include <AP_HAL.h>
-
-#include "AP_GPS_MTK.h"
+// Constructors ////////////////////////////////////////////////////////////////
+AP_GPS_MTK::AP_GPS_MTK(Stream *s) : GPS(s)
+{
+}
 
 // Public Methods //////////////////////////////////////////////////////////////
 void
-AP_GPS_MTK::init(AP_HAL::UARTDriver *s, enum GPS_Engine_Setting nav_setting)
+AP_GPS_MTK::init(enum GPS_Engine_Setting nav_setting)
 {
-	_port = s;
     _port->flush();
-	_step = 0;
-
     // initialize serial port for binary protocol use
     // XXX should assume binary, let GPS_AUTO handle dynamic config?
     _port->print(MTK_SET_BINARY);
@@ -43,6 +42,8 @@ AP_GPS_MTK::init(AP_HAL::UARTDriver *s, enum GPS_Engine_Setting nav_setting)
 
     // set initial epoch code
     _epoch = TIME_OF_DAY;
+
+    idleTimeout = 1200;
 }
 
 // Process bytes available from the stream
@@ -137,14 +138,7 @@ restart:
                 break;
             }
 
-            // set fix type
-            if (_buffer.msg.fix_type == FIX_3D) {
-                fix = GPS::FIX_3D;
-            }else if (_buffer.msg.fix_type == FIX_2D) {
-                fix = GPS::FIX_2D;
-            }else{
-                fix = GPS::FIX_NONE;
-            }
+            fix                 = _buffer.msg.fix_type == FIX_3D;
             latitude            = _swapl(&_buffer.msg.latitude)  * 10;
             longitude           = _swapl(&_buffer.msg.longitude) * 10;
             altitude            = _swapl(&_buffer.msg.altitude);

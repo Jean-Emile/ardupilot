@@ -8,11 +8,21 @@
 
 #define TRUE 1
 #define FALSE 0
-#define ToRad(x) radians(x)	// *pi/180
-#define ToDeg(x) degrees(x)	// *180/pi
+#define ToRad(x) (x*0.01745329252)	// *pi/180
+#define ToDeg(x) (x*57.2957795131)	// *180/pi
 
 #define DEBUG 0
 #define SERVO_MAX 4500	// This value represents 45 degrees and is just an arbitrary representation of servo max travel.
+
+// failsafe
+// ----------------------
+#define FAILSAFE_NONE	0
+#define FAILSAFE_SHORT	1
+#define FAILSAFE_LONG	2
+#define FAILSAFE_GCS	3
+#define	FAILSAFE_SHORT_TIME 1500	// Miliiseconds
+#define	FAILSAFE_LONG_TIME  20000	// Miliiseconds
+
 
 // active altitude sensor
 // ----------------------
@@ -23,10 +33,9 @@
 #define SONAR_SOURCE_ANALOG_PIN 2
 
 // CH 7 control
-enum ch7_option {
-    CH7_DO_NOTHING=0,
-    CH7_SAVE_WP=1
-};
+#define CH7_DO_NOTHING   0
+#define CH7_SAVE_WP      1
+#define CH7_RTL          6
 
 #define T6 1000000
 #define T7 10000000
@@ -42,8 +51,13 @@ enum ch7_option {
 #define GPS_PROTOCOL_MTK19	6
 #define GPS_PROTOCOL_AUTO	7
 
-#define CH_STEER    CH_1
+#define CH_ROLL CH_1
+#define CH_PITCH CH_2
 #define CH_THROTTLE CH_3
+#define CH_RUDDER CH_4
+#define CH_YAW CH_4
+#define CH_AIL1 CH_5
+#define CH_AIL2 CH_6
 
 // HIL enumerations
 #define HIL_MODE_DISABLED			0
@@ -52,21 +66,15 @@ enum ch7_option {
 
 // Auto Pilot modes
 // ----------------
-enum mode {
-    MANUAL=0,
-	LEARNING=2,
-    STEERING=3,
-    HOLD=4,
-    AUTO=10,
-    RTL=11,
-    GUIDED=15,
-    INITIALISING=16
-};
+#define MANUAL 0
+#define CIRCLE 1			 // When flying sans GPS, and we loose the radio, just circle
+#define LEARNING 2
 
-// types of failsafe events
-#define FAILSAFE_EVENT_THROTTLE (1<<0)
-#define FAILSAFE_EVENT_GCS      (1<<1)
-#define FAILSAFE_EVENT_RC       (1<<2)
+#define AUTO 10
+#define RTL 11
+#define GUIDED 15
+#define INITIALISING 16     // in startup routines
+#define HEADALT      17   // Lock the current heading and altitude
 
 // Commands - Note that APM now uses a subset of the MAVLink protocol commands.  See enum MAV_CMD in the GCS_Mavlink library
 #define CMD_BLANK 0 // there is no command stored in the mem location requested
@@ -106,6 +114,7 @@ enum ap_message {
     MSG_RADIO_IN,
     MSG_RAW_IMU1,
     MSG_RAW_IMU3,
+    MSG_GPS_STATUS,
     MSG_GPS_RAW,
     MSG_SERVO_OUT,
     MSG_NEXT_WAYPOINT,
@@ -114,7 +123,6 @@ enum ap_message {
     MSG_AHRS,
     MSG_SIMSTATE,
     MSG_HWSTATUS,
-    MSG_RANGEFINDER,
     MSG_RETRY_DEFERRED // this must be last
 };
 
@@ -126,33 +134,31 @@ enum gcs_severity {
 };
 
 //  Logging parameters
-#define LOG_CTUN_MSG	        0x01
-#define LOG_NTUN_MSG    		0x02
-#define LOG_PERFORMANCE_MSG		0x03
-#define LOG_CMD_MSG			    0x04
-#define LOG_CURRENT_MSG 		0x05
-#define LOG_STARTUP_MSG 		0x06
-#define LOG_SONAR_MSG 		    0x07
-#define LOG_ATTITUDE_MSG        0x08
-#define LOG_MODE_MSG            0x09
-#define LOG_COMPASS_MSG         0x0A
-
+#define LOG_INDEX_MSG			0xF0
+#define LOG_ATTITUDE_MSG		0x01
+#define LOG_GPS_MSG			0x02
+#define LOG_MODE_MSG			0X03
+#define LOG_CONTROL_TUNING_MSG	        0X04
+#define LOG_NAV_TUNING_MSG		0X05
+#define LOG_PERFORMANCE_MSG		0X06
+#define LOG_RAW_MSG			0x07
+#define LOG_CMD_MSG			0x08
+#define LOG_CURRENT_MSG 		0x09
+#define LOG_STARTUP_MSG 		0x0A
 #define TYPE_AIRSTART_MSG		0x00
-#define TYPE_GROUNDSTART_MSG	0x01
+#define TYPE_GROUNDSTART_MSG	        0x01
 #define MAX_NUM_LOGS			100
 
-#define MASK_LOG_ATTITUDE_FAST 	(1<<0)
-#define MASK_LOG_ATTITUDE_MED 	(1<<1)
+#define MASK_LOG_ATTITUDE_FAST 	        (1<<0)
+#define MASK_LOG_ATTITUDE_MED 	        (1<<1)
 #define MASK_LOG_GPS 			(1<<2)
 #define MASK_LOG_PM 			(1<<3)
 #define MASK_LOG_CTUN 			(1<<4)
 #define MASK_LOG_NTUN			(1<<5)
 #define MASK_LOG_MODE			(1<<6)
-#define MASK_LOG_IMU			(1<<7)
+#define MASK_LOG_RAW			(1<<7)
 #define MASK_LOG_CMD			(1<<8)
-#define MASK_LOG_CURRENT		(1<<9)
-#define MASK_LOG_SONAR   		(1<<10)
-#define MASK_LOG_COMPASS   		(1<<11)
+#define MASK_LOG_CUR			(1<<9)
 
 // Waypoint Modes
 // ----------------
@@ -176,8 +182,8 @@ enum gcs_severity {
 #define	ALTITUDE_HISTORY_LENGTH 8	//Number of (time,altitude) points to regress a climb rate from
 
 
-#define BATTERY_VOLTAGE(x) (x->voltage_average()*g.volt_div_ratio)
-#define CURRENT_AMPS(x) (x->voltage_average()-CURR_AMPS_OFFSET)*g.curr_amp_per_volt
+#define BATTERY_VOLTAGE(x) (x*(g.input_voltage/1024.0))*g.volt_div_ratio
+#define CURRENT_AMPS(x) ((x*(g.input_voltage/1024.0))-CURR_AMPS_OFFSET)*g.curr_amp_per_volt
 
 #define RELAY_PIN 47
 
@@ -206,15 +212,13 @@ enum gcs_severity {
 // mark a function as not to be inlined
 #define NOINLINE __attribute__((noinline))
 
-// InertialSensor driver types
-#define CONFIG_INS_OILPAN  1
+#define CONFIG_INS_OILPAN 1
 #define CONFIG_INS_MPU6000 2
-#define CONFIG_INS_STUB    3
-#define CONFIG_INS_PX4     4
 
-// compass driver types
-#define AP_COMPASS_HMC5843   1
-#define AP_COMPASS_PX4       2
-#define AP_COMPASS_HIL       3
+#define APM_HARDWARE_APM1  1
+#define APM_HARDWARE_APM2 2
+
+#define AP_BARO_BMP085   1
+#define AP_BARO_MS5611   2
 
 #endif // _DEFINES_H

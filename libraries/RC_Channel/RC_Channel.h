@@ -3,15 +3,11 @@
 /// @file	RC_Channel.h
 /// @brief	RC_Channel manager, with EEPROM-backed storage of constants.
 
-#ifndef __RC_CHANNEL_H__
-#define __RC_CHANNEL_H__
+#ifndef RC_Channel_h
+#define RC_Channel_h
 
 #include <AP_Common.h>
-#include <AP_Param.h>
-
-#define RC_CHANNEL_TYPE_ANGLE 0
-#define RC_CHANNEL_TYPE_RANGE 1
-#define RC_CHANNEL_TYPE_ANGLE_RAW 2
+#include <APM_RC.h>
 
 #define RC_CHANNEL_TYPE_ANGLE       0
 #define RC_CHANNEL_TYPE_RANGE       1
@@ -29,7 +25,9 @@ public:
     RC_Channel(uint8_t ch_out) :
         _high(1),
         _ch_out(ch_out) {
-		AP_Param::setup_object_defaults(this, var_info);
+		if (_reverse == 0) {
+			_reverse = 1;
+		}
     }
 
     // setup min and max radio values in CLI
@@ -52,7 +50,6 @@ public:
 
     // read input from APM_RC - create a control_in value
     void        set_pwm(int16_t pwm);
-    void        set_pwm_no_deadzone(int16_t pwm);
 
     // pwm is stored here
     int16_t        radio_in;
@@ -85,18 +82,19 @@ public:
     // includes offset from PWM
     //int16_t   get_radio_out(void);
 
-    int16_t                                         pwm_to_angle_dz(uint16_t dead_zone);
+    int16_t                                         pwm_to_angle_dz(int16_t dead_zone);
     int16_t                                         pwm_to_angle();
     float                                           norm_input();
     float                                           norm_output();
     int16_t                                         angle_to_pwm();
     int16_t                                         pwm_to_range();
-    int16_t                                         pwm_to_range_dz(uint16_t dead_zone);
     int16_t                                         range_to_pwm();
 
+    static void                                     set_apm_rc(APM_RC_Class * apm_rc);
     void                                            output();
     void                                            input();
     void                                            enable_out();
+    static APM_RC_Class *                           _apm_rc;
 
     static const struct AP_Param::GroupInfo         var_info[];
 
@@ -111,7 +109,7 @@ private:
     uint8_t         _ch_out;
 };
 
-// This is ugly, but it fixes poorly architected library
+// This is ugly, but it fixes compilation on arduino
 #include "RC_Channel_aux.h"
 
 #endif

@@ -1,8 +1,7 @@
 // -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 /// @file	ap_limits.cpp
-/// @brief	Imposes limits on location (geofence), altitude and other parameters
-/// Each breach will trigger an action or set of actions to recover.
-/// Adapted from geofence.
+/// @brief	Imposes limits on location (geofence), altitude and other parameters.
+///         Each breach will trigger an action or set of actions to recover. Adapted from geofence.
 /// @author Andrew Tridgell
 ///         Andreas Antonopoulos
 
@@ -57,7 +56,18 @@ const AP_Param::GroupInfo AP_Limits::var_info[] PROGMEM = {
 };
 
 AP_Limits::AP_Limits() {
-    AP_Param::setup_object_defaults(this, var_info);
+    last_trigger = 0;
+    last_action = 0;
+    last_recovery = 0;
+    last_clear = 0;
+    last_status_update = 0;
+    breach_count = 0;
+    mods_enabled = 0;
+    mods_required = 0;
+    mods_triggered = 0;
+    mods_recovering = 0;
+    old_mode_switch = 0;
+    _channel = 0;
     _state = LIMITS_INIT;
 }
 
@@ -87,8 +97,7 @@ bool AP_Limits::debug() {
 
 
 AP_Limit_Module *AP_Limits::modules_first() {
-     // reset current to head of list
-    _modules_current = _modules_head;
+    _modules_current = _modules_head;     // reset current to head of list
     return _modules_head;
 }
 
@@ -98,8 +107,7 @@ AP_Limit_Module *AP_Limits::modules_current() {
 
 AP_Limit_Module *AP_Limits::modules_next() {
     if (_modules_current) {
-         // move to "next" (which might be NULL)
-        _modules_current = _modules_current->next();
+        _modules_current = _modules_current->next();         // move to "next" (which might be NULL)
     }
     return _modules_current;
 }
@@ -124,12 +132,11 @@ AP_Limit_Module *AP_Limits::modules_last() {
 }
 
 void AP_Limits::modules_add(AP_Limit_Module *m) {
-    if (_modules_head) {
-        // if there is a module linked add to the end of the list
-        modules_last()->link(m);
-    } else {
-        // otherwise, this will be the "head"
-        _modules_head = m;
+    if (_modules_head) {     // if there is a module linked
+        modules_last()->link(m);         // add to the end of the list
+    }
+    else {
+        _modules_head = m;         // otherwise, this will be the "head"
     }
 }
 
@@ -138,13 +145,11 @@ bool AP_Limits::required() {
 }
 
 bool AP_Limits::check_all() {
-    // required=false, means "all"
-    return check_triggered(false);
+    return (bool) check_triggered(false);     // required=false, means "all"
 }
 
 bool AP_Limits::check_required() {
-    // required=true, means "only required modules"
-    return check_triggered(true);
+    return (bool) check_triggered(true);     // required=true, means "only required modules"
 }
 
 bool AP_Limits::check_triggered(bool only_required) {
@@ -175,30 +180,28 @@ bool AP_Limits::check_triggered(bool only_required) {
     }
 
     if (only_required) {
-        // just modules that are both required AND triggered. (binary AND)
-        return (mods_required & mods_triggered) != 0;
-    } else {
-        return mods_triggered != 0;
+        return (bool) (mods_required & mods_triggered);                 // just modules that are both required AND triggered. (binary AND)
     }
+    else return (bool) (mods_triggered);
 }
 
-int8_t AP_Limits::state() {
-    return _state.get();
+AP_Int8 AP_Limits::state() {
+    return _state;
 }
 
-int8_t AP_Limits::safetime() {
-    return _safetime.get();
+AP_Int8 AP_Limits::safetime() {
+    return _safetime;
 }
 
 void AP_Limits::set_state(int s) {
-    _state.set(s);
+    _state = (int) s;
 }
 
 
-int8_t AP_Limits::channel() {
-    return _channel.get();
+AP_Int8 AP_Limits::channel() {
+    return _channel;
 }
 
-int8_t AP_Limits::recmode() {
-    return _recmode.get();
+AP_Int8 AP_Limits::recmode() {
+    return _recmode;
 }

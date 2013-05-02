@@ -55,22 +55,22 @@ static struct Location get_cmd_with_index_raw(int16_t i)
     }else{
         // read WP position
         mem = (WP_START_BYTE) + (i * WP_SIZE);
-        temp.id = hal.storage->read_byte(mem);
+        temp.id = eeprom_read_byte((uint8_t*)(uintptr_t)mem);
 
         mem++;
-        temp.options = hal.storage->read_byte(mem);
+        temp.options = eeprom_read_byte((uint8_t*)(uintptr_t)mem);
 
         mem++;
-        temp.p1 = hal.storage->read_byte(mem);
+        temp.p1 = eeprom_read_byte((uint8_t*)(uintptr_t)mem);
 
         mem++;
-        temp.alt = hal.storage->read_dword(mem);
+        temp.alt = (long)eeprom_read_dword((uint32_t*)(uintptr_t)mem);
 
         mem += 4;
-        temp.lat = hal.storage->read_dword(mem);
+        temp.lat = (long)eeprom_read_dword((uint32_t*)(uintptr_t)mem);
 
         mem += 4;
-        temp.lng = hal.storage->read_dword(mem);
+        temp.lng = (long)eeprom_read_dword((uint32_t*)(uintptr_t)mem);
     }
 
     return temp;
@@ -99,32 +99,33 @@ static struct Location get_cmd_with_index(int16_t i)
 // -------
 static void set_cmd_with_index(struct Location temp, int16_t i)
 {
-    i = constrain_int16(i, 0, g.command_total.get());
-    uint16_t mem = WP_START_BYTE + (i * WP_SIZE);
+    i = constrain(i, 0, g.command_total.get());
+    intptr_t mem = WP_START_BYTE + (i * WP_SIZE);
 
-    // force home wp to absolute height
-    if (i == 0) {
-        temp.options &= ~(MASK_OPTIONS_RELATIVE_ALT);
+    // Set altitude options bitmask
+    // XXX What is this trying to do?
+    if ((temp.options & MASK_OPTIONS_RELATIVE_ALT) && i != 0) {
+        temp.options = MASK_OPTIONS_RELATIVE_ALT;
+    } else {
+        temp.options = 0;
     }
-    // zero unused bits
-    temp.options &= (MASK_OPTIONS_RELATIVE_ALT | MASK_OPTIONS_LOITER_DIRECTION);
 
-    hal.storage->write_byte(mem, temp.id);
+    eeprom_write_byte((uint8_t *)   mem, temp.id);
 
     mem++;
-    hal.storage->write_byte(mem, temp.options);
+    eeprom_write_byte((uint8_t *)   mem, temp.options);
 
     mem++;
-    hal.storage->write_byte(mem, temp.p1);
+    eeprom_write_byte((uint8_t *)   mem, temp.p1);
 
     mem++;
-    hal.storage->write_dword(mem, temp.alt);
+    eeprom_write_dword((uint32_t *) mem, temp.alt);
 
     mem += 4;
-    hal.storage->write_dword(mem, temp.lat);
+    eeprom_write_dword((uint32_t *) mem, temp.lat);
 
     mem += 4;
-    hal.storage->write_dword(mem, temp.lng);
+    eeprom_write_dword((uint32_t *) mem, temp.lng);
 }
 
 static void decrement_cmd_index()
@@ -147,7 +148,7 @@ static int32_t read_alt_to_hold()
  *  This function stores waypoint commands
  *  It looks to see what the next command type is and finds the last command.
  */
-static void set_next_WP(const struct Location *wp)
+static void set_next_WP(struct Location *wp)
 {
     // copy the current WP into the OldWP slot
     // ---------------------------------------
@@ -184,32 +185,33 @@ static void set_next_WP(const struct Location *wp)
     // -----------------------------------------------
     target_altitude_cm = current_loc.alt;
 
-    if (prev_WP.id != MAV_CMD_NAV_TAKEOFF && 
-        prev_WP.alt != home.alt && 
-        (next_WP.id == MAV_CMD_NAV_WAYPOINT || next_WP.id == MAV_CMD_NAV_LAND)) {
+    if(prev_WP.id != MAV_CMD_NAV_TAKEOFF && prev_WP.alt != home.alt && (next_WP.id == MAV_CMD_NAV_WAYPOINT || next_WP.id == MAV_CMD_NAV_LAND))
         offset_altitude_cm = next_WP.alt - prev_WP.alt;
-    } else {
-        offset_altitude_cm = 0;        
-    }
+    else
+        offset_altitude_cm = 0;
 
     // zero out our loiter vals to watch for missed waypoints
-    loiter_angle_reset();
+    loiter_delta            = 0;
+    loiter_sum                      = 0;
+    loiter_total            = 0;
 
     // this is handy for the groundstation
     wp_totalDistance        = get_distance(&current_loc, &next_WP);
     wp_distance             = wp_totalDistance;
+    target_bearing_cd       = get_bearing_cd(&current_loc, &next_WP);
+    nav_bearing_cd          = target_bearing_cd;
 
-    loiter_angle_reset();
+    // to check if we have missed the WP
+    // ----------------------------
+    old_target_bearing_cd   = target_bearing_cd;
+
+    // set a new crosstrack bearing
+    // ----------------------------
+    reset_crosstrack();
 }
 
 static void set_guided_WP(void)
 {
-    if (g.loiter_radius < 0) {
-        loiter.direction = -1;
-    } else {
-        loiter.direction = 1;
-    }
-
     // copy the current location into the OldWP slot
     // ---------------------------------------
     prev_WP = current_loc;
@@ -226,8 +228,15 @@ static void set_guided_WP(void)
     // this is handy for the groundstation
     wp_totalDistance        = get_distance(&current_loc, &next_WP);
     wp_distance             = wp_totalDistance;
+    target_bearing_cd       = get_bearing_cd(&current_loc, &next_WP);
 
-    loiter_angle_reset();
+    // to check if we have missed the WP
+    // ----------------------------
+    old_target_bearing_cd = target_bearing_cd;
+
+    // set a new crosstrack bearing
+    // ----------------------------
+    reset_crosstrack();
 }
 
 // run this at setup on the ground

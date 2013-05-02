@@ -1,7 +1,9 @@
 #ifndef AP_ADC_H
 #define AP_ADC_H
 
-#include <AP_Common.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <../AP_PeriodicProcess/AP_PeriodicProcess.h>
 
 /*
  *       AP_ADC.cpp - Analog Digital Converter Base Class for Ardupilot Mega
@@ -23,7 +25,7 @@ class AP_ADC
 public:
     AP_ADC() {
     };                // Constructor
-    virtual void            Init() = 0;
+    virtual void            Init(AP_PeriodicProcess * scheduler = NULL) = 0;
 
     /* read one channel value */
     virtual float           Ch(uint8_t ch_num) = 0;

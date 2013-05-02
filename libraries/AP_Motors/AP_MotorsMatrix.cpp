@@ -7,10 +7,8 @@
  *   License as published by the Free Software Foundation; either
  *   version 2.1 of the License, or (at your option) any later version.
  */
-#include <AP_HAL.h>
-#include "AP_MotorsMatrix.h"
 
-extern const AP_HAL::HAL& hal;
+#include "AP_MotorsMatrix.h"
 
 // Init
 void AP_MotorsMatrix::Init()
@@ -28,19 +26,22 @@ void AP_MotorsMatrix::Init()
 // set update rate to motors - a value in hertz
 void AP_MotorsMatrix::set_update_rate( uint16_t speed_hz )
 {
+    uint32_t fast_channel_mask = 0;
     int8_t i;
 
     // record requested speed
     _speed_hz = speed_hz;
 
     // check each enabled motor
-    uint32_t mask = 0;
     for( i=0; i<AP_MOTORS_MAX_NUM_MOTORS; i++ ) {
         if( motor_enabled[i] ) {
-		mask |= 1U << _motor_to_channel_map[i];
+            // set-up fast channel mask
+            fast_channel_mask |= _BV(_motor_to_channel_map[i]);                 // add to fast channel map
         }
     }
-    hal.rcout->set_freq( mask, _speed_hz );
+
+    // enable fast channels
+    _rc->SetFastOutputChannels(fast_channel_mask, _speed_hz);
 }
 
 // set frame orientation (normally + or X)
@@ -69,7 +70,7 @@ void AP_MotorsMatrix::enable()
     // enable output channels
     for( i=0; i<AP_MOTORS_MAX_NUM_MOTORS; i++ ) {
         if( motor_enabled[i] ) {
-            hal.rcout->enable_ch(_motor_to_channel_map[i]);
+            _rc->enable_out(_motor_to_channel_map[i]);
         }
     }
 }
@@ -83,7 +84,7 @@ void AP_MotorsMatrix::output_min()
     for( i=0; i<AP_MOTORS_MAX_NUM_MOTORS; i++ ) {
         if( motor_enabled[i] ) {
             motor_out[i] = _rc_throttle->radio_min;
-            hal.rcout->write(_motor_to_channel_map[i], motor_out[i]);
+            _rc->OutputCh(_motor_to_channel_map[i], motor_out[i]);
         }
     }
 }
@@ -104,7 +105,7 @@ void AP_MotorsMatrix::output_armed()
     _reached_limit = AP_MOTOR_NO_LIMITS_REACHED;
 
     // Throttle is 0 to 1000 only
-    _rc_throttle->servo_out = constrain_int16(_rc_throttle->servo_out, 0, _max_throttle);
+    _rc_throttle->servo_out = constrain(_rc_throttle->servo_out, 0, _max_throttle);
 
     // capture desired roll, pitch, yaw and throttle from receiver
     _rc_roll->calc_pwm();
@@ -256,7 +257,7 @@ void AP_MotorsMatrix::output_armed()
         // clip motor output if required (shouldn't be)
         for( i=0; i<AP_MOTORS_MAX_NUM_MOTORS; i++ ) {
             if( motor_enabled[i] ) {
-                motor_out[i] = constrain_int16(motor_out[i], out_min, out_max);
+                motor_out[i] = constrain(motor_out[i], out_min, out_max);
             }
         }
     }
@@ -264,7 +265,7 @@ void AP_MotorsMatrix::output_armed()
     // send output to each motor
     for( i=0; i<AP_MOTORS_MAX_NUM_MOTORS; i++ ) {
         if( motor_enabled[i] ) {
-            hal.rcout->write(_motor_to_channel_map[i], motor_out[i]);
+            _rc->OutputCh(_motor_to_channel_map[i], motor_out[i]);
         }
     }
 }
@@ -272,6 +273,12 @@ void AP_MotorsMatrix::output_armed()
 // output_disarmed - sends commands to the motors
 void AP_MotorsMatrix::output_disarmed()
 {
+    if(_rc_throttle->control_in > 0) {
+        // we have pushed up the throttle
+        // remove safety for auto pilot
+        _auto_armed = true;
+    }
+
     // Send minimum values to all motors
     output_min();
 }
@@ -296,17 +303,17 @@ void AP_MotorsMatrix::output_test()
     output_min();
 
     // first delay is longer
-    hal.scheduler->delay(4000);
+    delay(4000);
 
     // loop through all the possible orders spinning any motors that match that description
     for( i=min_order; i<=max_order; i++ ) {
         for( j=0; j<AP_MOTORS_MAX_NUM_MOTORS; j++ ) {
             if( motor_enabled[j] && test_order[j] == i ) {
                 // turn on this motor and wait 1/3rd of a second
-                hal.rcout->write(_motor_to_channel_map[j], _rc_throttle->radio_min + 100);
-                hal.scheduler->delay(300);
-                hal.rcout->write(_motor_to_channel_map[j], _rc_throttle->radio_min);
-                hal.scheduler->delay(2000);
+                _rc->OutputCh(_motor_to_channel_map[j], _rc_throttle->radio_min + 100);
+                delay(300);
+                _rc->OutputCh(_motor_to_channel_map[j], _rc_throttle->radio_min);
+                delay(2000);
             }
         }
     }
@@ -342,14 +349,14 @@ void AP_MotorsMatrix::add_motor_raw(int8_t motor_num, float roll_fac, float pitc
 }
 
 // add_motor using just position and prop direction
-void AP_MotorsMatrix::add_motor(int8_t motor_num, float angle_degrees, float yaw_factor, int8_t testing_order)
+void AP_MotorsMatrix::add_motor(int8_t motor_num, float angle_degrees, int8_t direction, int8_t testing_order)
 {
     // call raw motor set-up method
     add_motor_raw(
         motor_num,
-        cosf(radians(angle_degrees + 90)),               // roll factor
-        cosf(radians(angle_degrees)),                    // pitch factor
-        yaw_factor,                                      // yaw factor
+        cos(radians(angle_degrees + 90)),               // roll factor
+        cos(radians(angle_degrees)),                    // pitch factor
+        (float)direction,                                               // yaw factor
         testing_order);
 
 }

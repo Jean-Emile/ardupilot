@@ -4,14 +4,13 @@ set -x
 
 killall -q ArduPlane.elf
 pkill -f runsim.py
-killall -q JSBSim
 set -e
 
 autotest=$(dirname $(readlink -e $0))
 pushd $autotest/../../ArduPlane
 make clean obc-sitl
 
-tfile=$(mktemp)
+tfile=$(tempfile)
 echo r > $tfile
 #gnome-terminal -e "gdb -x $tfile --args /tmp/ArduPlane.build/ArduPlane.elf"
 gnome-terminal -e /tmp/ArduPlane.build/ArduPlane.elf

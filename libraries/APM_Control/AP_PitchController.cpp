@@ -7,12 +7,8 @@
 //	License as published by the Free Software Foundation; either
 //	version 2.1 of the License, or (at your option) any later version.
 
-#include <AP_Math.h>
-#include <AP_HAL.h>
-#include <AP_Common.h>
+#include <math.h>
 #include "AP_PitchController.h"
-
-extern const AP_HAL::HAL& hal;
 
 const AP_Param::GroupInfo AP_PitchController::var_info[] PROGMEM = {
 	AP_GROUPINFO("AP",        0, AP_PitchController, _kp_angle,       1.0),
@@ -28,7 +24,7 @@ const AP_Param::GroupInfo AP_PitchController::var_info[] PROGMEM = {
 
 int32_t AP_PitchController::get_servo_out(int32_t angle, float scaler, bool stabilize)
 {
-	uint32_t tnow = hal.scheduler->millis();
+	uint32_t tnow = millis();
 	uint32_t dt = tnow - _last_t;
 	
 	if (_last_t == 0 || dt > 1000) {
@@ -37,7 +33,7 @@ int32_t AP_PitchController::get_servo_out(int32_t angle, float scaler, bool stab
 	_last_t = tnow;
 	
 	if(_ahrs == NULL) return 0;
-	float delta_time    = (float)dt / 1000.0f;
+	float delta_time    = (float)dt / 1000.0;
 	
 	int8_t inv = 1;
 	if(abs(_ahrs->roll_sensor)>9000) inv = -1;
@@ -47,20 +43,17 @@ int32_t AP_PitchController::get_servo_out(int32_t angle, float scaler, bool stab
 	
 	float rate = _ahrs->get_pitch_rate_earth();
 	
-	float RC = 1/(2*PI*_fCut);
+	float RC = 1/(2*M_PI*_fCut);
 	rate = _last_rate +
 	(delta_time / (RC + delta_time)) * (rate - _last_rate);
 	_last_rate = rate;
 	
-	float roll_scaler = 1/constrain(cosf(_ahrs->roll),0.33f,1);
+	float roll_scaler = 1/constrain(cos(_ahrs->roll),.33,1);
 	
 	int32_t desired_rate = angle_err * _kp_angle;
 	
-	if (_max_rate_neg && desired_rate < -_max_rate_neg) {
-        desired_rate = -_max_rate_neg;
-    } else if (_max_rate_pos && desired_rate > _max_rate_pos) {
-        desired_rate = _max_rate_pos;
-    }
+	if (_max_rate_neg && desired_rate < -_max_rate_neg) desired_rate = -_max_rate_neg;
+	else if (_max_rate_pos && desired_rate > _max_rate_pos) desired_rate = _max_rate_pos;
 	
 	desired_rate *= roll_scaler;
 	
@@ -70,7 +63,7 @@ int32_t AP_PitchController::get_servo_out(int32_t angle, float scaler, bool stab
 	
 	int32_t rate_error = desired_rate - ToDeg(rate)*100;
 	
-	float roll_ff = _roll_ff * 1000 * (roll_scaler-1.0f);
+	float roll_ff = _roll_ff * 1000 * (roll_scaler-1.0);
 	if(roll_ff > 4500)
 		roll_ff = 4500;
 	else if(roll_ff < 0)
@@ -80,7 +73,7 @@ int32_t AP_PitchController::get_servo_out(int32_t angle, float scaler, bool stab
 	
 	//rate integrator
 	if (!stabilize) {
-		if ((fabsf(_ki_rate) > 0) && (dt > 0))
+		if ((fabs(_ki_rate) > 0) && (dt > 0))
 		{
 			_integrator += (rate_error * _ki_rate) * scaler * delta_time;
 			if (_integrator < -4500-out) _integrator = -4500-out;

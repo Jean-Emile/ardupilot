@@ -111,7 +111,7 @@ def fly_square(mavproxy, mav, side=50, timeout=120):
 
     print("turn")
     hover(mavproxy, mav)
-    mavproxy.send('rc 4 1550\n')
+    mavproxy.send('rc 4 1700\n')
     if not wait_heading(mav, 0):
         return False
     mavproxy.send('rc 4 1500\n')
@@ -221,7 +221,7 @@ def fly_simple(mavproxy, mav, side=60, timeout=120):
     '''fly Simple, flying N then E'''
     mavproxy.send('switch 6\n')
     wait_mode(mav, 'STABILIZE')
-    mavproxy.send('rc 3 1350\n')
+    mavproxy.send('rc 3 1400\n')
 
     tstart = time.time()
     failed = False
@@ -292,7 +292,7 @@ def fly_mission(mavproxy, mav, height_accuracy=-1, target_altitude=None):
     mavproxy.send('switch 4\n') # auto mode
     wait_mode(mav, 'AUTO')
     #wait_altitude(mav, 30, 40)
-    ret = wait_waypoint(mav, 0, num_wp, timeout=500, mode='AUTO')
+    ret = wait_waypoint(mav, 0, num_wp, timeout=500)
     print("test: MISSION COMPLETE: passed=%s" % ret)
     # wait here until ready
     mavproxy.send('switch 5\n')
@@ -382,7 +382,7 @@ def fly_ArduCopter(viewerip=None):
     logfile = mavproxy.match.group(1)
     print("LOGFILE %s" % logfile)
 
-    buildlog = util.reltopdir("../buildlogs/ArduCopter-test.tlog")
+    buildlog = util.reltopdir("../buildlogs/ArduCopter-test.mavlog")
     print("buildlog=%s" % buildlog)
     if os.path.exists(buildlog):
         os.unlink(buildlog)

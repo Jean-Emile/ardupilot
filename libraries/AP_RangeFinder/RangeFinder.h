@@ -1,8 +1,8 @@
-#ifndef __RANGEFINDER_H__
-#define __RANGEFINDER_H__
+#ifndef RangeFinder_h
+#define RangeFinder_h
 
 #include <AP_Common.h>
-#include <AP_HAL.h>
+#include <AP_AnalogSource.h>
 #include <Filter.h> // Filter library
 
 /*
@@ -21,38 +21,25 @@
 class RangeFinder
 {
 protected:
-    RangeFinder(AP_HAL::AnalogSource * source, FilterInt16 *filter) :
+    RangeFinder(AP_AnalogSource * source, FilterInt16 *filter) :
         _analog_source(source),
         _mode_filter(filter) {
     }
 public:
-    // raw_value: read the sensor
-    int  raw_value;
-    // distance: in cm
-    int  distance;
-    // maximum measurable distance: in cm
-    int  max_distance;
-    // minimum measurable distance: in cm
-    int  min_distance;
 
-    int  orientation_x, orientation_y, orientation_z;
-    void set_orientation(int x, int y, int z);
+    int                     raw_value; // raw value from the sensor
+    int                     distance; // distance in cm
+    int                     max_distance; // maximum measurable distance (in cm) - should be set in child's constructor
+    int                     min_distance; // minimum measurable distance (in cm) - should be set in child's constructor
+    int                     orientation_x, orientation_y, orientation_z;
 
-    /**
-     * convert_raw_to_distance:
-     * function that each child class should override to convert voltage
-     * to distance (in cm)
-     */
-    virtual int convert_raw_to_distance(int _raw_value) {
+    virtual void            set_orientation(int x, int y, int z);
+    virtual int             convert_raw_to_distance(int _raw_value) {
         return _raw_value;
-    }
-    /**
-     * read:
-     * read value from sensor and return distance in cm
-     */
-    virtual int read();
+    }                                                                               // function that each child class should override to convert voltage to distance
+    virtual int             read(); // read value from sensor and return distance in cm
 
-    AP_HAL::AnalogSource*       _analog_source;
+    AP_AnalogSource *       _analog_source;
     FilterInt16 *           _mode_filter;
 };
-#endif // __RANGEFINDER_H__
+#endif

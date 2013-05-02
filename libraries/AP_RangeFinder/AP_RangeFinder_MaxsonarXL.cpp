@@ -25,11 +25,17 @@
  *
  */
 
+// AVR LibC Includes
+#if defined(ARDUINO) && ARDUINO >= 100
+ #include "Arduino.h"
+#else
+ #include "WConstants.h"
+#endif
 #include "AP_RangeFinder_MaxsonarXL.h"
 
 // Constructor //////////////////////////////////////////////////////////////
 
-AP_RangeFinder_MaxsonarXL::AP_RangeFinder_MaxsonarXL(AP_HAL::AnalogSource *source, FilterInt16 *filter) :
+AP_RangeFinder_MaxsonarXL::AP_RangeFinder_MaxsonarXL(AP_AnalogSource *source, FilterInt16 *filter) :
     RangeFinder(source, filter),
     _scaler(AP_RANGEFINDER_MAXSONARXL_SCALER)
 {
@@ -40,7 +46,7 @@ AP_RangeFinder_MaxsonarXL::AP_RangeFinder_MaxsonarXL(AP_HAL::AnalogSource *sourc
 // Public Methods //////////////////////////////////////////////////////////////
 float AP_RangeFinder_MaxsonarXL::calculate_scaler(int sonar_type, float adc_refence_voltage)
 {
-    float type_scaler = 1.0f;
+    float type_scaler = 1.0;
     switch(sonar_type) {
     case AP_RANGEFINDER_MAXSONARXL:
         type_scaler = AP_RANGEFINDER_MAXSONARXL_SCALER;
@@ -63,6 +69,6 @@ float AP_RangeFinder_MaxsonarXL::calculate_scaler(int sonar_type, float adc_refe
         max_distance = AP_RANGEFINDER_MAXSONARHRLV_MAX_DISTANCE;
         break;
     }
-    _scaler = type_scaler * adc_refence_voltage / 5.0f;
+    _scaler = type_scaler * adc_refence_voltage / 5.0;
     return _scaler;
 }

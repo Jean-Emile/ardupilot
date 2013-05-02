@@ -1,19 +1,15 @@
 // -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: t -*-
 
-#ifndef __AP_YAW_CONTROLLER_H__
-#define __AP_YAW_CONTROLLER_H__
+#ifndef AP_YawController_h
+#define AP_YawController_h
 
+#include <FastSerial.h>
 #include <AP_AHRS.h>
 #include <AP_Common.h>
 #include <math.h> // for fabs()
 
 class AP_YawController {
 public:                      
-	AP_YawController()
-	{
-		AP_Param::setup_object_defaults(this, var_info);
-	}
-
 	void set_ahrs(AP_AHRS *ahrs) { 
 		_ahrs = ahrs; 
 		_ins = _ahrs->get_ins();
@@ -40,7 +36,10 @@ private:
 	AP_AHRS *_ahrs;
 	AP_InertialSensor *_ins;
 
-	static const float _fCut;
+	// Low pass filter cut frequency for derivative calculation.
+	// FCUT macro computes a frequency cut based on an acceptable delay.
+	#define FCUT(d) (1 / ( 2 * 3.14 * (d) ) )
+	static const float _fCut = FCUT(.5);
 };
 
-#endif // __AP_YAW_CONTROLLER_H__
+#endif

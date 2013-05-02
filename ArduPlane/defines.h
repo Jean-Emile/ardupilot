@@ -8,8 +8,8 @@
 
 #define TRUE 1
 #define FALSE 0
-#define ToRad(x) radians(x)	// *pi/180
-#define ToDeg(x) degrees(x)	// *180/pi
+#define ToRad(x) (x*0.01745329252)      // *pi/180
+#define ToDeg(x) (x*57.2957795131)      // *180/pi
 
 #define DEBUG 0
 #define LOITER_RANGE 60 // for calculating power outside of loiter radius
@@ -54,41 +54,24 @@
 #define CH_RUDDER CH_4
 #define CH_YAW CH_4
 
-// HIL enumerations. Note that HIL_MODE_ATTITUDE and HIL_MODE_SENSORS
-// are now the same thing, and are sensors based. The old define is
-// kept to allow old APM_Config.h headers to keep working
+// HIL enumerations
 #define HIL_MODE_DISABLED                       0
 #define HIL_MODE_ATTITUDE                       1
 #define HIL_MODE_SENSORS                        2
 
 enum FlightMode {
-    MANUAL        = 0,
-    CIRCLE        = 1,
-    STABILIZE     = 2,
-    TRAINING      = 3,
+    MANUAL = 0,
+    CIRCLE = 1,
+    STABILIZE = 2,
     FLY_BY_WIRE_A = 5,
     FLY_BY_WIRE_B = 6,
-    AUTO          = 10,
-    RTL           = 11,
-    LOITER        = 12,
-    GUIDED        = 15,
-    INITIALISING  = 16
+    AUTO = 10,
+    RTL = 11,
+    LOITER = 12,
+    GUIDED = 15,
+    INITIALISING = 16
 };
 
-// type of stick mixing enabled
-enum StickMixing {
-    STICK_MIXING_DISABLED = 0,
-    STICK_MIXING_FBW      = 1,
-    STICK_MIXING_DIRECT   = 2
-};
-
-enum ChannelMixing {
-    MIXING_DISABLED = 0,
-    MIXING_UPUP     = 1,
-    MIXING_UPDN     = 2,
-    MIXING_DNUP     = 3,
-    MIXING_DNDN     = 4
-};
 
 // Commands - Note that APM now uses a subset of the MAVLink protocol
 // commands.  See enum MAV_CMD in the GCS_Mavlink library
@@ -101,9 +84,6 @@ enum ChannelMixing {
 //--------------------
 #define MASK_OPTIONS_RELATIVE_ALT       (1<<0)          // 1 = Relative
                                                         // altitude
-#define MASK_OPTIONS_LOITER_DIRECTION   (1<<2)          // 0 = CW
-                                                        // 1 = CCW
-
 
 //repeating events
 #define NO_REPEAT 0
@@ -153,37 +133,32 @@ enum gcs_severity {
     SEVERITY_CRITICAL
 };
 
-// Logging message types. NOTE: If you change the value of one
-// of these then existing logs will break! Only add at the end, and 
-// mark unused ones as 'deprecated', but leave them in
-enum log_messages {
-    LOG_INDEX_MSG,
-    LOG_CTUN_MSG,
-    LOG_NTUN_MSG,
-    LOG_PERFORMANCE_MSG,
-    LOG_CMD_MSG,
-    LOG_CURRENT_MSG,
-    LOG_STARTUP_MSG,
-    TYPE_AIRSTART_MSG,
-    TYPE_GROUNDSTART_MSG,
-    LOG_CAMERA_MSG,
-    LOG_ATTITUDE_MSG,
-    LOG_MODE_MSG,
-    LOG_COMPASS_MSG,
-    MAX_NUM_LOGS
-};
+//  Logging parameters
+#define LOG_INDEX_MSG                   0xF0
+#define LOG_ATTITUDE_MSG                0x01
+#define LOG_GPS_MSG                             0x02
+#define LOG_MODE_MSG                    0X03
+#define LOG_CONTROL_TUNING_MSG  0X04
+#define LOG_NAV_TUNING_MSG              0X05
+#define LOG_PERFORMANCE_MSG             0X06
+#define LOG_RAW_MSG                             0x07
+#define LOG_CMD_MSG                             0x08
+#define LOG_CURRENT_MSG                 0x09
+#define LOG_STARTUP_MSG                 0x0A
+#define TYPE_AIRSTART_MSG               0x00
+#define TYPE_GROUNDSTART_MSG    0x01
+#define MAX_NUM_LOGS                    100
 
-#define MASK_LOG_ATTITUDE_FAST          (1<<0)
-#define MASK_LOG_ATTITUDE_MED           (1<<1)
+#define MASK_LOG_ATTITUDE_FAST  (1<<0)
+#define MASK_LOG_ATTITUDE_MED   (1<<1)
 #define MASK_LOG_GPS                    (1<<2)
 #define MASK_LOG_PM                     (1<<3)
 #define MASK_LOG_CTUN                   (1<<4)
 #define MASK_LOG_NTUN                   (1<<5)
 #define MASK_LOG_MODE                   (1<<6)
-#define MASK_LOG_IMU                    (1<<7)
+#define MASK_LOG_RAW                    (1<<7)
 #define MASK_LOG_CMD                    (1<<8)
-#define MASK_LOG_CURRENT                (1<<9)
-#define MASK_LOG_COMPASS                (1<<10)
+#define MASK_LOG_CUR                    (1<<9)
 
 // Waypoint Modes
 // ----------------
@@ -208,8 +183,11 @@ enum log_messages {
                                         // regress a climb rate from
 
 
-#define BATTERY_VOLTAGE(x) (x->voltage_average()*g.volt_div_ratio)
-#define CURRENT_AMPS(x) (x->voltage_average()-g.curr_amp_offset)*g.curr_amp_per_volt
+#define BATTERY_VOLTAGE(x) (x*(g.input_voltage/1024.0))*g.volt_div_ratio
+#define CURRENT_AMPS(x) ((x*(g.input_voltage/1024.0))-g.curr_amp_offset)*g.curr_amp_per_volt
+
+#define RELAY_PIN 47
+
 
 #define AN4                     4
 #define AN5                     5
@@ -244,22 +222,14 @@ enum log_messages {
 // mark a function as not to be inlined
 #define NOINLINE __attribute__((noinline))
 
-// InertialSensor driver types
-#define CONFIG_INS_OILPAN  1
+#define CONFIG_INS_OILPAN 1
 #define CONFIG_INS_MPU6000 2
-#define CONFIG_INS_STUB    3
-#define CONFIG_INS_PX4     4
 
-// barometer driver types
+#define APM_HARDWARE_APM1  1
+#define APM_HARDWARE_APM2 2
+
 #define AP_BARO_BMP085   1
 #define AP_BARO_MS5611   2
-#define AP_BARO_PX4      3
-#define AP_BARO_HIL      4
-
-// compass driver types
-#define AP_COMPASS_HMC5843   1
-#define AP_COMPASS_PX4       2
-#define AP_COMPASS_HIL       3
 
 // altitude control algorithms
 enum {

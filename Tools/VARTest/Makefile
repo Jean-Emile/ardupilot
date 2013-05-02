@@ -1,4 +1,7 @@
 #
 # Trivial makefile for building APM
 #
-include ../../mk/apm.mk
+include ../../libraries/AP_Common/Arduino.mk
+
+sitl:
+	make -f ../../libraries/Desktop/Desktop.mk

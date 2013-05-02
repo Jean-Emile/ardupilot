@@ -3,15 +3,13 @@
  *       2012 Code by Jason Short, Randy Mackay. DIYDrones.com
  */
 
+// includes
+#include <Arduino_Mega_ISR_Registry.h>
+#include <FastSerial.h>
 #include <AP_Common.h>
-#include <AP_Progmem.h>
-#include <AP_HAL.h>
-#include <AP_HAL_AVR.h>
 #include <AP_Math.h>
-#include <AP_Param.h>
-#include <AC_PID.h>
-
-const AP_HAL::HAL& hal = AP_HAL_BOARD_DRIVER;
+#include <APM_RC.h> // ArduPilot RC Library
+#include <AC_PID.h> // ArduPilot Mega RC Library
 
 // default PID values
 #define TEST_P 1.0
@@ -19,12 +17,23 @@ const AP_HAL::HAL& hal = AP_HAL_BOARD_DRIVER;
 #define TEST_D 0.2
 #define TEST_IMAX 10
 
+// Serial ports
+FastSerialPort0(Serial);        // FTDI/console
+
+// Global variables
+Arduino_Mega_ISR_Registry isr_registry;
+APM_RC_APM1 APM_RC;
+
 // setup function
 void setup()
 {
-    hal.console->println("ArduPilot Mega AC_PID library test");
+    Serial.begin(115200);
+    Serial.println("ArduPilot Mega AC_PID library test");
 
-    hal.scheduler->delay(1000);
+    isr_registry.init();
+    APM_RC.Init(&isr_registry);          // APM Radio initialization
+
+    delay(1000);
 }
 
 // main loop
@@ -39,20 +48,18 @@ void loop()
     float dt = 1000/50;
 
     // display PID gains
-    hal.console->printf("P %f  I %f  D %f  imax %f\n", pid.kP(), pid.kI(), pid.kD(), pid.imax());
+    Serial.printf("P %f  I %f  D %f  imax %f\n", pid.kP(), pid.kI(), pid.kD(), pid.imax());
 
     // capture radio trim
-    radio_trim = hal.rcin->read(0);
+    radio_trim = APM_RC.InputCh(0);
 
     while( true ) {
-        radio_in = hal.rcin->read(0);
+        radio_in = APM_RC.InputCh(0);
         error = radio_in - radio_trim;
         control = pid.get_pid(error, dt);
 
         // display pid results
-        hal.console->printf("radio: %d\t err: %d\t pid:%d\n", radio_in, error, control);
-        hal.scheduler->delay(50);
+        Serial.printf("radio: %d\t err: %d\t pid:%d\n", radio_in, error, control);
+        delay(50);
     }
 }
-
-AP_HAL_MAIN();

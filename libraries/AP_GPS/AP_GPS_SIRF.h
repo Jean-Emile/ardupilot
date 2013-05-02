@@ -8,31 +8,23 @@
 //	License as published by the Free Software Foundation; either
 //	version 2.1 of the License, or (at your option) any later version.
 //
-#ifndef __AP_GPS_SIRF_H__
-#define __AP_GPS_SIRF_H__
+#ifndef AP_GPS_SIRF_h
+#define AP_GPS_SIRF_h
 
-#include <AP_HAL.h>
 #include "GPS.h"
 
 #define SIRF_SET_BINARY "$PSRF100,0,38400,8,1,0*3C"
 
 class AP_GPS_SIRF : public GPS {
 public:
-	AP_GPS_SIRF() : 
-		GPS(),
-		_step(0),
-		_gather(false),
-		_payload_length(0),
-		_payload_counter(0),
-		_msg_id(0)
-		{}
+    AP_GPS_SIRF(Stream *s);
 
-    virtual void        init(AP_HAL::UARTDriver *s, enum GPS_Engine_Setting nav_setting = GPS_ENGINE_NONE);
+    virtual void        init(enum GPS_Engine_Setting nav_setting = GPS_ENGINE_NONE);
     virtual bool        read();
 	static bool         _detect(uint8_t data);
 
 private:
-    #pragma pack(push,1)
+// XXX this is being ignored by the compiler #pragma pack(1)
     struct sirf_geonav {
         uint16_t fix_invalid;
         uint16_t fix_type;
@@ -70,7 +62,7 @@ private:
         uint8_t hdop;
         uint8_t mode_info;
     };
-    #pragma pack(pop)
+// #pragma pack(pop)
     enum sirf_protocol_bytes {
         PREAMBLE1 = 0xa0,
         PREAMBLE2 = 0xa2,

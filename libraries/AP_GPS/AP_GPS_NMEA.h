@@ -39,12 +39,11 @@
 ///
 
 
-#ifndef __AP_GPS_NMEA_H__
-#define __AP_GPS_NMEA_H__
+#ifndef AP_GPS_NMEA_h
+#define AP_GPS_NMEA_h
 
-#include <AP_HAL.h>
 #include "GPS.h"
-#include <AP_Progmem.h>
+#include <avr/pgmspace.h>
 
 
 /// NMEA parser
@@ -52,20 +51,14 @@
 class AP_GPS_NMEA : public GPS
 {
 public:
-	AP_GPS_NMEA(void) : 
-	GPS(),
-	_parity(0),
-	_is_checksum_term(false),
-	_sentence_type(0),
-	_term_number(0),
-	_term_offset(0),
-	_gps_data_good(false)
-		{}
+    /// Constructor
+    ///
+    AP_GPS_NMEA(Stream *s);
 
     /// Perform a (re)initialisation of the GPS; sends the
     /// protocol configuration messages.
     ///
-    virtual void        init(AP_HAL::UARTDriver *s, enum GPS_Engine_Setting nav_setting = GPS_ENGINE_NONE);
+    virtual void        init(enum GPS_Engine_Setting nav_setting = GPS_ENGINE_NONE);
 
     /// Checks the serial receive buffer for characters,
     /// attempts to parse NMEA data and updates internal state
@@ -166,4 +159,4 @@ private:
     //@}
 };
 
-#endif // __AP_GPS_NMEA_H__
+#endif

@@ -38,25 +38,15 @@ void failsafe_check(uint32_t tnow)
     if (in_failsafe && tnow - last_timestamp > 20000) {
         // pass RC inputs to outputs every 20ms
         last_timestamp = tnow;
-        hal.rcin->clear_overrides();
-        g.channel_roll.radio_out     = hal.rcin->read(CH_1);
-        g.channel_pitch.radio_out    = hal.rcin->read(CH_2);
-        g.channel_throttle.radio_out = hal.rcin->read(CH_3);
-        g.channel_rudder.radio_out   = hal.rcin->read(CH_4);
-        if (g.vtail_output != MIXING_DISABLED) {
-            channel_output_mixer(g.vtail_output, g.channel_pitch.radio_out, g.channel_rudder.radio_out);
-        } else if (g.elevon_output != MIXING_DISABLED) {
-            channel_output_mixer(g.elevon_output, g.channel_pitch.radio_out, g.channel_roll.radio_out);
+        APM_RC.clearOverride();
+        uint8_t start_ch = 0;
+        if (demoing_servos) {
+            start_ch = 1;
         }
-        if (!demoing_servos) {
-            servo_write(CH_1, g.channel_roll.radio_out);
+        for (uint8_t ch=start_ch; ch<4; ch++) {
+            APM_RC.OutputCh(ch, APM_RC.InputCh(ch));
         }
-        servo_write(CH_2, g.channel_pitch.radio_out);
-        servo_write(CH_3, g.channel_throttle.radio_out);
-        servo_write(CH_4, g.channel_rudder.radio_out);
-
         RC_Channel_aux::copy_radio_in_out(RC_Channel_aux::k_manual, true);
         RC_Channel_aux::copy_radio_in_out(RC_Channel_aux::k_aileron_with_input, true);
-        RC_Channel_aux::copy_radio_in_out(RC_Channel_aux::k_elevator_with_input, true);
     }
 }

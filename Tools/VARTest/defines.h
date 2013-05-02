@@ -8,8 +8,8 @@
 
 #define TRUE 1
 #define FALSE 0
-#define ToRad(x) radians(x)	// *pi/180
-#define ToDeg(x) degrees(x)	// *180/pi
+#define ToRad(x) (x*0.01745329252)	// *pi/180
+#define ToDeg(x) (x*57.2957795131)	// *180/pi
 
 #define DEBUG 0
 #define LOITER_RANGE 60 // for calculating power outside of loiter radius
@@ -136,6 +136,7 @@ enum gcs_severity {
 //  Logging parameters
 #define LOG_INDEX_MSG			0xF0
 #define LOG_ATTITUDE_MSG		0x01
+#define LOG_GPS_MSG				0x02
 #define LOG_MODE_MSG			0X03
 #define LOG_CONTROL_TUNING_MSG	0X04
 #define LOG_NAV_TUNING_MSG		0X05
@@ -218,6 +219,9 @@ enum gcs_severity {
 
 #define CONFIG_IMU_OILPAN 1
 #define CONFIG_IMU_MPU6000 2
+
+#define APM_HARDWARE_APM1  1
+#define APM_HARDWARE_APM2 2
 
 #define AP_BARO_BMP085   1
 #define AP_BARO_MS5611   2

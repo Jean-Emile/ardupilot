@@ -6,17 +6,20 @@
 /// @author Andrew Tridgell
 ///         Andreas Antonopoulos
 
-#ifndef __AP_LIMIT_ALTITUDE_H__
-#define __AP_LIMIT_ALTITUDE_H__
-
-#include "AP_Limits.h"
-#include "AP_Limit_Module.h"
+#include <AP_Limits.h>
+#include <AP_Limit_Module.h>
+#include <AP_Common.h>
+#include <AP_Math.h>
 #include <AP_Param.h>
+
+#ifndef AP_Limit_Altitude_H
+ #define  AP_Limit_Altitude_H
+#endif  // AP_Limit_Altitude_H
 
 class AP_Limit_Altitude : public AP_Limit_Module {
 
 public:
-    AP_Limit_Altitude(const struct Location *current_loc);
+    AP_Limit_Altitude(struct Location *current_loc);
 
     AP_Int32        min_alt();
     AP_Int32        max_alt();
@@ -27,11 +30,9 @@ public:
     static const struct AP_Param::GroupInfo         var_info[];
 
 protected:
-    const struct Location *                               _current_loc;
+    struct Location *                               _current_loc;
     AP_Int32        _min_alt;
     AP_Int32        _max_alt;
 
 
 };
-
-#endif // __AP_LIMIT_ALTITUDE_H__

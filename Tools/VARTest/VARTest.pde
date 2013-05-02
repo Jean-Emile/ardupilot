@@ -5,51 +5,34 @@
   Andrew Tridgell February 2012
 */
 
-#include <math.h>
-#include <stdarg.h>
-#include <stdio.h>
-
+#include <FastSerial.h>
 #include <AP_Common.h>
-#include <AP_Progmem.h>
-#include <AP_HAL.h>
-#include <AP_Menu.h>
-#include <AP_Param.h>
-#include <AP_GPS.h>         // ArduPilot GPS library
-#include <AP_Baro.h>        // ArduPilot barometer library
-#include <AP_Compass.h>     // ArduPilot Mega Magnetometer Library
-#include <AP_Math.h>        // ArduPilot Mega Vector/Matrix math Library
-#include <AP_ADC.h>         // ArduPilot Mega Analog to Digital Converter Library
-#include <AP_ADC_AnalogSource.h>
-#include <AP_InertialSensor.h> // Inertial Sensor Library
-#include <AP_AHRS.h>         // ArduPilot Mega DCM Library
+#include <Arduino_Mega_ISR_Registry.h>
 #include <PID.h>            // PID library
+#include <APM_RC.h>         // ArduPilot Mega RC Library
 #include <RC_Channel.h>     // RC Channel Library
-#include <AP_RangeFinder.h>     // Range finder library
-#include <Filter.h>                     // Filter library
-#include <AP_Buffer.h>      // APM FIFO Buffer
-#include <AP_Relay.h>       // APM relay
-#include <AP_Camera.h>          // Photo or video camera
-#include <AP_Airspeed.h>
-#include <memcheck.h>
-
-#include <APM_OBC.h>
-#include <APM_Control.h>
-#include <GCS_MAVLink.h>    // MAVLink GCS definitions
-#include <AP_Mount.h>           // Camera/Antenna mount
-#include <AP_Declination.h> // ArduPilot Mega Declination Helper Library
+#include <AP_Compass.h>     // ArduPilot Mega Magnetometer Library
+#include <SPI.h>			// Arduino SPI lib
+#include <I2C.h>
+#include <AP_Semaphore.h>   // for removing conflict between optical flow and dataflash on SPI3 bus
 #include <DataFlash.h>
+#include <AP_AHRS.h>
+#include <AP_ADC.h>
+#include <AP_Baro.h>
+#include <Filter.h>
+#include <AP_Buffer.h>
+#include <GCS_MAVLink.h>
+#include <AP_PeriodicProcess.h>
+#include <AP_InertialSensor.h> // Inertial Sensor (uncalibated IMU) Library
+#include <AP_GPS.h>
+#include <AP_Math.h>
 #include <SITL.h>
-
+#include <GCS_MAVLink.h>
+#include <AP_Declination.h>
+#include <AP_AnalogSource.h>
+#include <AP_Airspeed.h>
 #include "config.h"
 #include "Parameters.h"
-
-#include <AP_HAL_AVR.h>
-#include <AP_HAL_AVR_SITL.h>
-#include <AP_HAL_Empty.h>
-
-AP_HAL::BetterStream* cliSerial;
-
-const AP_HAL::HAL& hal = AP_HAL_BOARD_DRIVER;
 
 // this sets up the parameter table, and sets the default values. This
 // must be the first AP_Param variable declared to ensure its
@@ -60,36 +43,45 @@ AP_Param param_loader(var_info, WP_START_BYTE);
 
 static Parameters g;
 
+static AP_ADC_ADS7844          adc;
 static GPS         *g_gps;
-AP_GPS_Auto     g_gps_driver(&g_gps);
-AP_InertialSensor_MPU6000 ins;
+AP_GPS_Auto     g_gps_driver(&Serial1, &g_gps);
+# if CONFIG_IMU_TYPE == CONFIG_IMU_MPU6000
+  AP_InertialSensor_MPU6000 ins( CONFIG_MPU6000_CHIP_SELECT_PIN );
+# else
+  AP_InertialSensor_Oilpan ins( &adc );
+#endif // CONFIG_IMU_TYPE
 AP_AHRS_DCM  ahrs(&ins, g_gps);
 
-static AP_Compass_HIL compass;
+Arduino_Mega_ISR_Registry isr_registry;
+#ifdef DESKTOP_BUILD
+AP_Compass_HIL          compass;
+#else
+static AP_Compass_HMC5843 compass;
+#endif
 AP_Baro_BMP085_HIL      barometer;
+
 SITL					sitl;
+
+FastSerialPort0(Serial);
+FastSerialPort1(Serial1);       // GPS port
 
 #define SERIAL0_BAUD 115200
 
-#define Debug(fmt, args...)  cliSerial->printf("%s:%d: " fmt "\n", __FUNCTION__, __LINE__ , ##args)
+#define Debug(fmt, args...)  Serial.printf("%s:%d: " fmt "\n", __FUNCTION__, __LINE__ , ##args)
 
 
 void setup() {
-	cliSerial = hal.uartA;
-
-	hal.uartA->begin(SERIAL0_BAUD, 128, 128);
-
-    // load the default values of variables listed in var_info[]
-    AP_Param::setup_sketch_defaults();
+	Serial.begin(SERIAL0_BAUD, 128, 128);
 
 	load_parameters();
 
 	// show some sizes
-	cliSerial->printf_P(PSTR("sizeof(RC_Channel)=%u\n"), (unsigned)sizeof(RC_Channel));
-	cliSerial->printf_P(PSTR("sizeof(g)=%u\n"), (unsigned)sizeof(g));
-	cliSerial->printf_P(PSTR("sizeof(g.throttle_min)=%u\n"), (unsigned)sizeof(g.throttle_min));
-	cliSerial->printf_P(PSTR("sizeof(g.channel_roll)=%u\n"), (unsigned)sizeof(g.channel_roll));
-	cliSerial->printf_P(PSTR("throttle_max now: %u\n"), (unsigned)g.throttle_max);
+	Serial.printf_P(PSTR("sizeof(RC_Channel)=%u\n"), (unsigned)sizeof(RC_Channel));
+	Serial.printf_P(PSTR("sizeof(g)=%u\n"), (unsigned)sizeof(g));
+	Serial.printf_P(PSTR("sizeof(g.throttle_min)=%u\n"), (unsigned)sizeof(g.throttle_min));
+	Serial.printf_P(PSTR("sizeof(g.channel_roll)=%u\n"), (unsigned)sizeof(g.channel_roll));
+	Serial.printf_P(PSTR("throttle_max now: %u\n"), (unsigned)g.throttle_max);
 
 	// some ad-hoc testing
 
@@ -98,7 +90,7 @@ void setup() {
 	g.throttle_min.save();
 	g.throttle_min.set_and_save(g.throttle_min+1);
 
-	cliSerial->printf_P(PSTR("throttle_min now: %u\n"), (unsigned)g.throttle_min);
+	Serial.printf_P(PSTR("throttle_min now: %u\n"), (unsigned)g.throttle_min);
 
 	// find a variable by name
 	AP_Param                  *vp;
@@ -106,31 +98,29 @@ void setup() {
 	vp = AP_Param::find("RLL2SRV_P", &type);
 	((AP_Float *)vp)->set(23);
 
-	cliSerial->printf_P(PSTR("RLL2SRV_P=%f\n"),
+	Serial.printf_P(PSTR("RLL2SRV_P=%f\n"),
 					g.pidServoRoll.kP());
 
-#if 0
 	char s[AP_MAX_NAME_SIZE+1];
 
 	g.throttle_min.copy_name(s, sizeof(s));
 	s[AP_MAX_NAME_SIZE] = 0;
-	cliSerial->printf_P(PSTR("THROTTLE_MIN.copy_name()->%s\n"), s);
+	Serial.printf_P(PSTR("THROTTLE_MIN.copy_name()->%s\n"), s);
 
 	g.channel_roll.radio_min.copy_name(s, sizeof(s));
 	s[AP_MAX_NAME_SIZE] = 0;
-	cliSerial->printf_P(PSTR("RC1_MIN.copy_name()->%s %p\n"), s, &g.channel_roll.radio_min);
-#endif
+	Serial.printf_P(PSTR("RC1_MIN.copy_name()->%s %p\n"), s, &g.channel_roll.radio_min);
 
 	Vector3f ofs;
 	ofs = compass.get_offsets();
-	cliSerial->printf_P(PSTR("Compass: %f %f %f\n"),
+	Serial.printf_P(PSTR("Compass: %f %f %f\n"),
 					ofs.x, ofs.y, ofs.z);
 	ofs.x += 1.1;
 	ofs.y += 1.2;
 	ofs.z += 1.3;
 	compass.set_offsets(ofs);
 	compass.save_offsets();
-	cliSerial->printf_P(PSTR("Compass: %f %f %f\n"),
+	Serial.printf_P(PSTR("Compass: %f %f %f\n"),
 					ofs.x, ofs.y, ofs.z);
 
 	test_vector3f();
@@ -143,9 +133,9 @@ void setup() {
 		//test_variable(ap, type);
 	}
 
-	AP_Param::show_all(cliSerial);
+	AP_Param::show_all();
 
-	cliSerial->println_P(PSTR("All done."));
+	Serial.println_P(PSTR("All done."));
 }
 
 void loop()
@@ -173,17 +163,17 @@ void test_vector3f(void)
 	v->load();
 
 	vec = *v;
-	cliSerial->printf_P(PSTR("vec %f %f %f\n"),
+	Serial.printf_P(PSTR("vec %f %f %f\n"),
 					vec.x, vec.y, vec.z);
 
 	if (vec.x != 10 ||
 		vec.y != 11 ||
 		vec.z != 12) {
-		cliSerial->printf_P(PSTR("wrong value for compass vector\n"));
+		Serial.printf_P(PSTR("wrong value for compass vector\n"));
 	}
 }
 
-#if 0
+
 // test all interfaces for a variable
 void test_variable(AP_Param *ap, enum ap_var_type type)
 {
@@ -193,7 +183,7 @@ void test_variable(AP_Param *ap, enum ap_var_type type)
 	value++;
 
 	ap->copy_name(s, sizeof(s), type==AP_PARAM_FLOAT);
-	cliSerial->printf_P(PSTR("Testing variable '%s' of type %u\n"),
+	Serial.printf_P(PSTR("Testing variable '%s' of type %u\n"),
 					s, type);
 	enum ap_var_type type2;
 	if (AP_Param::find(s, &type2) != ap ||
@@ -374,6 +364,3 @@ void test_variable(AP_Param *ap, enum ap_var_type type)
 		break;
 	}
 }
-#endif
-
-AP_HAL_MAIN();

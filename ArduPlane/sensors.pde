@@ -7,11 +7,12 @@ static LowPassFilterInt32 altitude_filter;
 static void init_barometer(void)
 {
     gcs_send_text_P(SEVERITY_LOW, PSTR("Calibrating barometer"));    
-    barometer.calibrate();
+    barometer.calibrate(mavlink_delay);
 
     // filter at 100ms sampling, with 0.7Hz cutoff frequency
     altitude_filter.set_cutoff_frequency(0.1, 0.7);
 
+    ahrs.set_barometer(&barometer);
     gcs_send_text_P(SEVERITY_LOW, PSTR("barometer calibration complete"));
 }
 
@@ -32,7 +33,7 @@ static void read_airspeed(void)
 
 static void zero_airspeed(void)
 {
-    airspeed.calibrate();
+    airspeed.calibrate(mavlink_delay);
     gcs_send_text_P(SEVERITY_LOW,PSTR("zero airspeed calibrated"));
 }
 
@@ -44,14 +45,16 @@ static void read_battery(void)
     }
 
     if(g.battery_monitoring == 3 || g.battery_monitoring == 4) {
+        static AP_AnalogSource_Arduino batt_volt_pin(g.battery_volt_pin);
         // this copes with changing the pin at runtime
-        batt_volt_pin->set_pin(g.battery_volt_pin);
-        battery_voltage1 = BATTERY_VOLTAGE(batt_volt_pin);
+        batt_volt_pin.set_pin(g.battery_volt_pin);
+        battery_voltage1 = BATTERY_VOLTAGE(batt_volt_pin.read_average());
     }
     if(g.battery_monitoring == 4) {
+        static AP_AnalogSource_Arduino batt_curr_pin(g.battery_curr_pin);
         // this copes with changing the pin at runtime
-        batt_curr_pin->set_pin(g.battery_curr_pin);
-        current_amps1    = CURRENT_AMPS(batt_curr_pin);
+        batt_curr_pin.set_pin(g.battery_curr_pin);
+        current_amps1    = CURRENT_AMPS(batt_curr_pin.read_average());
         current_total1   += current_amps1 * (float)delta_ms_medium_loop * 0.0002778;                                    // .0002778 is 1/3600 (conversion to hours)
     }
 
@@ -66,9 +69,9 @@ static void read_battery(void)
 // RC_CHANNELS_SCALED message
 void read_receiver_rssi(void)
 {
-    rssi_analog_source->set_pin(g.rssi_pin);
-    float ret = rssi_analog_source->read_average();
-    receiver_rssi = constrain_int16(ret, 0, 255);
+    RSSI_pin.set_pin(g.rssi_pin);
+    float ret = RSSI_pin.read();
+    receiver_rssi = constrain(ret, 0, 255);
 }
 
 

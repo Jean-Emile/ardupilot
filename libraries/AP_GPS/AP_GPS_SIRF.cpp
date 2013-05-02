@@ -23,13 +23,16 @@ static const uint8_t init_messages[] PROGMEM = {
     0xa0, 0xa2, 0x00, 0x08, 0xa6, 0x00, 0x29, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0xd0, 0xb0, 0xb3
 };
 
+// Constructors ////////////////////////////////////////////////////////////////
+AP_GPS_SIRF::AP_GPS_SIRF(Stream *s) : GPS(s)
+{
+}
+
 // Public Methods //////////////////////////////////////////////////////////////
 void
-AP_GPS_SIRF::init(AP_HAL::UARTDriver *s, enum GPS_Engine_Setting nav_setting)
+AP_GPS_SIRF::init(enum GPS_Engine_Setting nav_setting)
 {
-	_port = s;
     _port->flush();
-	_step = 0;
 
     // For modules that default to something other than SiRF binary,
     // the module-specific subclass should take care of switching to binary mode
@@ -37,6 +40,7 @@ AP_GPS_SIRF::init(AP_HAL::UARTDriver *s, enum GPS_Engine_Setting nav_setting)
 
     // send SiRF binary setup messages
     _write_progstr_block(_port, (const prog_char *)init_messages, sizeof(init_messages));
+    idleTimeout = 1200;
 }
 
 // Process bytes available from the stream
@@ -170,14 +174,8 @@ AP_GPS_SIRF::_parse_gps(void)
     switch(_msg_id) {
     case MSG_GEONAV:
         time                    = _swapl(&_buffer.nav.time);
-        // parse fix type
-        if (_buffer.nav.fix_invalid) {
-            fix = GPS::FIX_NONE;
-        }else if ((_buffer.nav.fix_type & FIX_MASK) == FIX_3D) {
-            fix = GPS::FIX_3D;
-        }else{
-            fix = GPS::FIX_2D;
-        }
+        //fix				= (0 == _buffer.nav.fix_invalid) && (FIX_3D == (_buffer.nav.fix_type & FIX_MASK));
+        fix                             = (0 == _buffer.nav.fix_invalid);
         latitude                = _swapl(&_buffer.nav.latitude);
         longitude               = _swapl(&_buffer.nav.longitude);
         altitude                = _swapl(&_buffer.nav.altitude_msl);

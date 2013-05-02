@@ -8,11 +8,11 @@ handle_process_nav_cmd()
 {
 	// reset navigation integrators
 	// -------------------------
-    g.pidNavSteer.reset_I();
+	reset_I();
 
-    gcs_send_text_fmt(PSTR("Executing command ID #%i"),next_nav_command.id);
-
+		gcs_send_text_fmt(PSTR("Executing command ID #%i"),next_nav_command.id);
 	switch(next_nav_command.id){
+
 		case MAV_CMD_NAV_TAKEOFF:
 			do_takeoff();
 			break;
@@ -109,8 +109,8 @@ static void handle_process_do_command()
 
 static void handle_no_commands()
 {      
-	gcs_send_text_fmt(PSTR("No commands - setting HOLD"));
-    set_mode(HOLD);
+	gcs_send_text_fmt(PSTR("No commands - setting MANUAL"));
+    set_mode(MANUAL);
 }
 
 /********************************************************************************/
@@ -194,6 +194,13 @@ static bool verify_takeoff()
 {  return true;
 }
 
+static void calc_turn_radius(void)    // JLN update - adjut automaticaly the wp_radius Vs the speed and the turn angle
+{
+  wp_radius = ground_speed * 150 / g.roll_limit.get();
+  //cliSerial->println(wp_radius, DEC);
+}
+
+
 static bool verify_nav_wp()
 {
     update_crosstrack();
@@ -203,6 +210,15 @@ static bool verify_nav_wp()
                           (unsigned)nav_command_index,
                           (unsigned)get_distance(&current_loc, &next_WP));
         return true;
+    }
+
+    if(g.auto_wp_radius) { 
+        calc_turn_radius();  // JLN update - auto-adap the wp_radius Vs the gspeed and max roll angle
+
+        if ((wp_distance > 0) && (wp_distance <= wp_radius)) {
+            gcs_send_text_fmt(PSTR("Reached Waypoint #%i"),nav_command_index);
+            return true;
+        }
     }
 
     // have we gone past the waypoint?
@@ -222,16 +238,9 @@ static bool verify_RTL()
 		gcs_send_text_P(SEVERITY_LOW,PSTR("Reached home"));
                 rtl_complete = true;
 		return true;
+	}else{
+		return false;
 	}
-
-    // have we gone past the waypoint?
-    if (location_passed_point(current_loc, prev_WP, next_WP)) {
-        gcs_send_text_fmt(PSTR("Reached Home dist %um"),
-                          (unsigned)get_distance(&current_loc, &next_WP));
-        return true;
-    }
-
-    return false;
 }
 
 /********************************************************************************/
@@ -326,9 +335,12 @@ static void do_change_speed()
 {
 	switch (next_nonnav_command.p1)
 	{
-		case 0:
-			if (next_nonnav_command.alt > 0)
-				g.speed_cruise.set(next_nonnav_command.alt * 100);
+		case 0: // Airspeed
+			if(next_nonnav_command.alt > 0)
+				g.airspeed_cruise.set(next_nonnav_command.alt * 100);
+			break;
+		case 1: // Ground speed
+			g.min_gndspeed.set(next_nonnav_command.alt * 100);
 			break;
 	}
 
@@ -351,8 +363,7 @@ static void do_set_home()
 
 static void do_set_servo()
 {
-    hal.rcout->enable_ch(next_nonnav_command.p1 - 1);
-    hal.rcout->write(next_nonnav_command.p1 - 1, next_nonnav_command.alt);
+	APM_RC.OutputCh(next_nonnav_command.p1 - 1, next_nonnav_command.alt);
 }
 
 static void do_set_relay()
@@ -378,12 +389,6 @@ static void do_repeat_servo()
 		event_value 	= next_nonnav_command.alt;
 
 		switch(next_nonnav_command.p1) {
-			case CH_2:
-				event_undo_value = g.rc_2.radio_trim;
-				break;
-			case CH_4:
-				event_undo_value = g.rc_4.radio_trim;
-				break;
 			case CH_5:
 				event_undo_value = g.rc_5.radio_trim;
 				break;

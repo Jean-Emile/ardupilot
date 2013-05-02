@@ -75,7 +75,7 @@ def fly_RTL(mavproxy, mav):
     print("Flying home in RTL")
     mavproxy.send('switch 2\n')
     wait_mode(mav, 'RTL')
-    if not wait_location(mav, homeloc, accuracy=120,
+    if not wait_location(mav, homeloc, accuracy=90,
                          target_altitude=homeloc.alt+100, height_accuracy=20,
                          timeout=90):
         return False
@@ -257,7 +257,7 @@ def fly_ArduPlane(viewerip=None):
     logfile = mavproxy.match.group(1)
     print("LOGFILE %s" % logfile)
 
-    buildlog = util.reltopdir("../buildlogs/ArduPlane-test.tlog")
+    buildlog = util.reltopdir("../buildlogs/ArduPlane-test.mavlog")
     print("buildlog=%s" % buildlog)
     if os.path.exists(buildlog):
         os.unlink(buildlog)

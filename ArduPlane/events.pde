@@ -11,9 +11,8 @@ static void failsafe_short_on_event(int16_t fstype)
     {
     case MANUAL:
     case STABILIZE:
-    case FLY_BY_WIRE_A:
-    case FLY_BY_WIRE_B:
-    case TRAINING:
+    case FLY_BY_WIRE_A:             // middle position
+    case FLY_BY_WIRE_B:             // middle position
         set_mode(CIRCLE);
         break;
 
@@ -37,16 +36,14 @@ static void failsafe_long_on_event(int16_t fstype)
 {
     // This is how to handle a long loss of control signal failsafe.
     gcs_send_text_P(SEVERITY_LOW, PSTR("Failsafe - Long event on, "));
-    //  If the GCS is locked up we allow control to revert to RC
-    hal.rcin->clear_overrides();
+    APM_RC.clearOverride();             //  If the GCS is locked up we allow control to revert to RC
     failsafe = fstype;
     switch(control_mode)
     {
     case MANUAL:
     case STABILIZE:
-    case FLY_BY_WIRE_A:
-    case FLY_BY_WIRE_B:
-    case TRAINING:
+    case FLY_BY_WIRE_A:             // middle position
+    case FLY_BY_WIRE_B:             // middle position
     case CIRCLE:
         set_mode(RTL);
         break;
@@ -107,11 +104,11 @@ static void update_events(void)
 
         switch (event_state.type) {
         case EVENT_TYPE_SERVO:
-            hal.rcout->enable_ch(event_state.rc_channel);
+            APM_RC.enable_out(event_state.rc_channel);
             if (event_state.repeat & 1) {
-                servo_write(event_state.rc_channel, event_state.undo_value);
+                APM_RC.OutputCh(event_state.rc_channel, event_state.undo_value);                 
             } else {
-                servo_write(event_state.rc_channel, event_state.servo_value);                 
+                APM_RC.OutputCh(event_state.rc_channel, event_state.servo_value);                 
             }
             break;
 

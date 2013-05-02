@@ -19,13 +19,6 @@ const AP_Param::Info var_info[] PROGMEM = {
     GSCALAR(sysid_this_mav,         "SYSID_THISMAV",  MAV_SYSTEM_ID),
     GSCALAR(sysid_my_gcs,           "SYSID_MYGCS",    255),
 
-    // @Param: SERIAL0_BAUD
-    // @DisplayName: USB Console Baud Rate
-    // @Description: The baud rate used on the main uart
-    // @Values: 1:1200,2:2400,4:4800,9:9600,19:19200,38:38400,57:57600,111:111100,115:115200
-    // @User: Standard
-    GSCALAR(serial0_baud,           "SERIAL0_BAUD",   SERIAL0_BAUD/1000),
-
     // @Param: SERIAL3_BAUD
     // @DisplayName: Telemetry Baud Rate
     // @Description: The baud rate used on the telemetry port
@@ -74,39 +67,26 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @User: Advanced
     GSCALAR(kff_throttle_to_pitch,  "KFF_THR2PTCH",   T_TO_P),
 
+    // @Param: MANUAL_LEVEL
+    // @DisplayName: Manual Level
+    // @Description: Setting this to Disabled(0) will enable autolevel on every boot. Setting it to Enabled(1) will do a calibration only when you tell it to
+    // @Values: 0:Disabled,1:Enabled
+    // @User: Advanced
+    GSCALAR(manual_level,           "MANUAL_LEVEL",   MANUAL_LEVEL),
+
     // @Param: STICK_MIXING
     // @DisplayName: Stick Mixing
-    // @Description: When enabled, this adds user stick input to the control surfaces in auto modes, allowing the user to have some degree of flight control without changing modes.  There are two types of stick mixing available. If you set STICK_MIXING to 1 then it will use "fly by wire" mixing, which controls the roll and pitch in the same way that the FBWA mode does. This is the safest option if you usually fly ArduPlane in FBWA or FBWB mode. If you set STICK_MIXING to 2 then it will enable direct mixing mode, which is what the STABILIZE mode uses. That will allow for much more extreme maneuvers while in AUTO mode.
-    // @Values: 0:Disabled,1:FBWMixing,2:DirectMixing
+    // @Description: When enabled, this adds user stick input to the control surfaces in auto modes, allowing the user to have some degree of flight control without changing modes
+    // @Values: 0:Disabled,1:Enabled
     // @User: Advanced
-    GSCALAR(stick_mixing,           "STICK_MIXING",   STICK_MIXING_FBW),
+    GSCALAR(stick_mixing,           "STICK_MIXING",   1),
 
-    // @Param: TKOFF_THR_MINSPD
-    // @DisplayName: Takeoff throttle min speed
-    // @Description: Minimum GPS ground speed in m/s before un-suppressing throttle in auto-takeoff. This is meant to be used for catapult launches where you want the motor to engage only after the plane leaves the catapult. Note that the GPS velocity will lag the real velocity by about 0.5seconds.
-    // @Units: m/s
-    // @Range: 0 30
-    // @Increment: 0.1
+    // @Param: RUDDER_STEER
+    // @DisplayName: Rudder steering on takeoff and landing
+    // @Description: When enabled, only rudder will be used for steering during takeoff and landing, with the ailerons used to hold the plane level
+    // @Values: 0:Disabled,1:Enabled
     // @User: User
-    GSCALAR(takeoff_throttle_min_speed,     "TKOFF_THR_MINSPD",  0),
-
-    // @Param: TKOFF_THR_MINACC
-    // @DisplayName: Takeoff throttle min acceleration
-    // @Description: Minimum forward acceleration in m/s/s before un-suppressing throttle in auto-takeoff. This is meant to be used for hand launches with a tractor style (front engine) plane. If this is set then the auto takeoff will only trigger if the pitch of the plane is between -30 and +45 degrees, and the roll is less than 30 degrees. This makes it less likely it will trigger due to carrying the plane with the nose down.
-    // @Units: m/s/s
-    // @Range: 0 30
-    // @Increment: 0.1
-    // @User: User
-    GSCALAR(takeoff_throttle_min_accel,     "TKOFF_THR_MINACC",  0),
-
-    // @Param: LEVEL_ROLL_LIMIT
-    // @DisplayName: Level flight roll limit
-    // @Description: This controls the maximum bank angle in degrees during flight modes where level flight is desired, such as in the final stages of landing, and during auto takeoff. This should be a small angle (such as 5 degrees) to prevent a wing hitting the runway during takeoff or landing. Setting this to zero will completely disable heading hold on auto takeoff and final landing approach.
-    // @Units: degrees
-    // @Range: 0 45
-    // @Increment: 1
-    // @User: User
-    GSCALAR(level_roll_limit,              "LEVEL_ROLL_LIMIT",   5),
+    GSCALAR(rudder_steer,           "RUDDER_STEER",   0),
 
     // @Param: land_pitch_cd
     // @DisplayName: Landing Pitch
@@ -131,12 +111,38 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @User: Advanced
     GSCALAR(land_flare_sec,          "LAND_FLARE_SEC",  2.0),
 
-	// @Param: NAV_CONTROLLER
-	// @DisplayName: Navigation controller selection
-	// @Description: Which navigation controller to enable
-	// @Values: 0:Legacy,1:L1Controller
-	// @User: Standard
-	GSCALAR(nav_controller,          "NAV_CONTROLLER",   AP_Navigation::CONTROLLER_L1),
+    // @Param: XTRK_GAIN_SC
+    // @DisplayName: Crosstrack Gain
+    // @Description: The scale between distance off the line and angle to meet the line (in Degrees * 100)
+    // @Range: 0 2000
+    // @Increment: 1
+    // @User: Standard
+    GSCALAR(crosstrack_gain,        "XTRK_GAIN_SC",   XTRACK_GAIN_SCALED),
+
+    // @Param: XTRK_ANGLE_CD
+    // @DisplayName: Crosstrack Entry Angle
+    // @Description: Maximum angle used to correct for track following.
+    // @Units: centi-Degrees
+    // @Range: 0 9000
+    // @Increment: 1
+    // @User: Standard
+    GSCALAR(crosstrack_entry_angle, "XTRK_ANGLE_CD",  XTRACK_ENTRY_ANGLE_CENTIDEGREE),
+
+    // @Param: XTRK_USE_WIND
+    // @DisplayName: Crosstrack Wind correction
+    // @Description: If enabled, use wind estimation for navigation crosstrack when using a compass for yaw
+    // @Values: 0:Disabled,1:Enabled
+    // @User: Standard
+    GSCALAR(crosstrack_use_wind, "XTRK_USE_WIND",     1),
+
+    // @Param: XTRK_MIN_DIST
+    // @DisplayName: Crosstrack mininum distance
+    // @Description: Minimum distance in meters between waypoints to do crosstrack correction.
+    // @Units: Meters
+    // @Range: 0 32767
+    // @Increment: 1
+    // @User: Standard
+    GSCALAR(crosstrack_min_distance, "XTRK_MIN_DIST",  50),
 
     // @Param: ALT_MIX
     // @DisplayName: Gps to Baro Mix
@@ -170,14 +176,14 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @DisplayName: Waypoint Radius
     // @Description: Defines the distance from a waypoint, that when crossed indicates the wp has been hit.
     // @Units: Meters
-    // @Range: 1 32767
+    // @Range: 1 127
     // @Increment: 1
     // @User: Standard
     GSCALAR(waypoint_radius,        "WP_RADIUS",      WP_RADIUS_DEFAULT),
 
     // @Param: WP_LOITER_RAD
     // @DisplayName: Waypoint Loiter Radius
-    // @Description: Defines the distance from the waypoint center, the plane will maintain during a loiter. If you set this value to a negative number then the default loiter direction will be counter-clockwise instead of clockwise.
+    // @Description: Defines the distance from the waypoint center, the plane will maintain during a loiter
     // @Units: Meters
     // @Range: 1 32767
     // @Increment: 1
@@ -247,14 +253,6 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Values: 0:Disabled,1:Enabled
     // @User: Standard
     GSCALAR(flybywire_elev_reverse, "FBWB_ELEV_REV",  0),
-
-    // @Param: FBWB_CLIMB_RATE
-    // @DisplayName: Fly By Wire B altitude change rate
-    // @Description: This sets the rate in m/s at which FBWB will change its target altitude for full elevator deflection. Note that the actual climb rate of the aircraft can be lower than this, depending on your airspeed and throttle control settings. If you have this parameter set to the default value of 2.0, then holding the elevator at maximum deflection for 10 seconds would change the target altitude by 20 meters.
-    // @Range: 1-10
-	// @Increment: 0.1
-    // @User: Standard
-    GSCALAR(flybywire_climb_rate, "FBWB_CLIMB_RATE",  2.0f),
 
     // @Param: THR_MIN
     // @DisplayName: Minimum Throttle
@@ -344,7 +342,7 @@ const AP_Param::Info var_info[] PROGMEM = {
 
     // @Param: FS_GCS_ENABL
     // @DisplayName: GCS failsafe enable
-    // @Description: Enable ground control station telemetry failsafe. Failsafe will trigger after 20 seconds of no MAVLink heartbeat messages. WARNING: Enabling this option opens up the possibility of your plane going into failsafe mode and running the motor on the ground it it loses contact with your ground station. If this option is enabled on an electric plane then either use a separate motor arming switch or remove the propeller in any ground testing.
+    // @Description: Enable ground control station telemetry failsafe. Failsafe will trigger after 20 seconds of no MAVLink heartbeat messages
     // @Values: 0:Disabled,1:Enabled
     // @User: Standard
     GSCALAR(gcs_heartbeat_fs_enabled, "FS_GCS_ENABL", GCS_HEARTBEAT_FAILSAFE),
@@ -357,7 +355,7 @@ const AP_Param::Info var_info[] PROGMEM = {
 
     // @Param: FLTMODE1
     // @DisplayName: FlightMode1
-    // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,3:TRAINING,5:FBWA,6:FBWB,10:Auto,11:RTL,12:Loiter,15:Guided
+    // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,5:FBWA,6:FBWB,10:Auto,11:RTL,12:Loiter,15:Guided
     // @User: Standard
     // @Description: Flight mode for switch position 1 (910 to 1230 and above 2049)
     GSCALAR(flight_mode1,           "FLTMODE1",       FLIGHT_MODE_1),
@@ -365,35 +363,35 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Param: FLTMODE2
     // @DisplayName: FlightMode2
     // @Description: Flight mode for switch position 2 (1231 to 1360)
-    // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,3:TRAINING,5:FBWA,6:FBWB,10:Auto,11:RTL,12:Loiter,15:Guided
+    // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,5:FBWA,6:FBWB,10:Auto,11:RTL,12:Loiter,15:Guided
     // @User: Standard
     GSCALAR(flight_mode2,           "FLTMODE2",       FLIGHT_MODE_2),
 
     // @Param: FLTMODE3
     // @DisplayName: FlightMode3
     // @Description: Flight mode for switch position 3 (1361 to 1490)
-    // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,3:TRAINING,5:FBWA,6:FBWB,10:Auto,11:RTL,12:Loiter,15:Guided
+    // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,5:FBWA,6:FBWB,10:Auto,11:RTL,12:Loiter,15:Guided
     // @User: Standard
     GSCALAR(flight_mode3,           "FLTMODE3",       FLIGHT_MODE_3),
 
     // @Param: FLTMODE4
     // @DisplayName: FlightMode4
     // @Description: Flight mode for switch position 4 (1491 to 1620)
-    // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,3:TRAINING,5:FBWA,6:FBWB,10:Auto,11:RTL,12:Loiter,15:Guided
+    // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,5:FBWA,6:FBWB,10:Auto,11:RTL,12:Loiter,15:Guided
     // @User: Standard
     GSCALAR(flight_mode4,           "FLTMODE4",       FLIGHT_MODE_4),
 
     // @Param: FLTMODE5
     // @DisplayName: FlightMode5
     // @Description: Flight mode for switch position 5 (1621 to 1749)
-    // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,3:TRAINING,5:FBWA,6:FBWB,10:Auto,11:RTL,12:Loiter,15:Guided
+    // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,5:FBWA,6:FBWB,10:Auto,11:RTL,12:Loiter,15:Guided
     // @User: Standard
     GSCALAR(flight_mode5,           "FLTMODE5",       FLIGHT_MODE_5),
 
     // @Param: FLTMODE6
     // @DisplayName: FlightMode6
     // @Description: Flight mode for switch position 6 (1750 to 2049)
-    // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,3:TRAINING,5:FBWA,6:FBWB,10:Auto,11:RTL,12:Loiter,15:Guided
+    // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,5:FBWA,6:FBWB,10:Auto,11:RTL,12:Loiter,15:Guided
     // @User: Standard
     GSCALAR(flight_mode6,           "FLTMODE6",       FLIGHT_MODE_6),
 
@@ -431,9 +429,9 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @User: Standard
     GSCALAR(auto_trim,              "TRIM_AUTO",      AUTO_TRIM),
 
-    // @Param: ELEVON_MIXING
+    // @Param: MIX_MODE
     // @DisplayName: Elevon mixing
-    // @Description: Enable elevon mixing  on both input and output. To enable just output mixing see the ELEVON_OUTPUT option.
+    // @Description: Enable elevon mixing
     // @Values: 0:Disabled,1:Enabled
     // @User: User
     GSCALAR(mix_mode,               "ELEVON_MIXING",  ELEVON_MIXING),
@@ -459,20 +457,6 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Values: -1:Disabled,1:Enabled
     // @User: User
     GSCALAR(reverse_ch2_elevon,     "ELEVON_CH2_REV", ELEVON_CH2_REVERSE),
-
-    // @Param: VTAIL_OUTPUT
-    // @DisplayName: VTail output
-    // @Description: Enable VTail output in software. If enabled then the APM will provide software VTail mixing on the elevator and rudder channels. There are 4 different mixing modes available, which refer to the 4 ways the elevator can be mapped to the two VTail servos. Note that you must not use VTail output mixing with hardware pass-through of RC values, such as with channel 8 manual control on an APM1. So if you use an APM1 then set FLTMODE_CH to something other than 8 before you enable VTAIL_OUTPUT.
-    // @Values: 0:Disabled,1:UpUp,2:UpDown,3:DownUp,4:DownDown
-    // @User: User
-    GSCALAR(vtail_output,           "VTAIL_OUTPUT",  0),
-
-    // @Param: ELEVON_OUTPUT
-    // @DisplayName: Elevon output
-    // @Description: Enable software elevon output mixer. If enabled then the APM will provide software elevon mixing on the aileron and elevator channels. There are 4 different mixing modes available, which refer to the 4 ways the elevator can be mapped to the two elevon servos. Note that you must not use elevon output mixing with hardware pass-through of RC values, such as with channel 8 manual control on an APM1. So if you use an APM1 then set FLTMODE_CH to something other than 8 before you enable ELEVON_OUTPUT.
-    // @Values: 0:Disabled,1:UpUp,2:UpDown,3:DownUp,4:DownDown
-    // @User: User
-    GSCALAR(elevon_output,           "ELEVON_OUTPUT",  0),
 
     // @Param: SYS_NUM_RESETS
     // @DisplayName: Num Resets
@@ -521,7 +505,7 @@ const AP_Param::Info var_info[] PROGMEM = {
 
     // @Param: TRIM_PITCH_CD
     // @DisplayName: Pitch angle offset
-    // @Description: offset to add to pitch - used for in-flight pitch trimming. It is recommended that instead of using this parameter you level your plane correctly on the ground for good flight attitude.
+    // @Description: offset to add to pitch - used for trimming tail draggers
     // @Units: centi-Degrees
     // @User: Advanced
     GSCALAR(pitch_trim_cd,        "TRIM_PITCH_CD",  0),
@@ -533,11 +517,6 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @User: User
     GSCALAR(RTL_altitude_cm,        "ALT_HOLD_RTL",   ALT_HOLD_HOME_CM),
 
-    // @Param: ALT_HOLD_FBWCM
-    // @DisplayName: Minimum altitude for FBWB mode
-    // @Description: This is the minimum altitude in centimeters that FBWB will allow. If you attempt to descend below this altitude then the plane will level off. A value of zero means no limit.
-    // @Units: centimeters
-    // @User: User
     GSCALAR(FBWB_min_altitude_cm,   "ALT_HOLD_FBWCM", ALT_HOLD_FBW_CM),
 
     // @Param: MAG_ENABLE
@@ -570,6 +549,8 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @User: Standard
     GSCALAR(curr_amp_offset,        "AMP_OFFSET",     0),
 
+    GSCALAR(input_voltage,          "INPUT_VOLTS",    INPUT_VOLTAGE),
+
     // @Param: BATT_CAPACITY
     // @DisplayName: Battery capacity
     // @Description: Capacity of the battery in mAh when full
@@ -598,21 +579,7 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @User: Standard
     GSCALAR(rssi_pin,            "RSSI_PIN",         -1),
 
-    // @Param: INVERTEDFLT_CH
-    // @DisplayName: Inverted flight channel
-    // @Description: A RC input channel number to enable inverted flight. If this is non-zero then the APM will monitor the correcponding RC input channel and will enable inverted flight when the channel goes above 1750.
-    // @Values: 0:Disabled,1:Channel1,2:Channel2,3:Channel3,4:Channel4,5:Channel5,6:Channel6,7:Channel7,8:Channel8
-    // @User: Standard
     GSCALAR(inverted_flight_ch,     "INVERTEDFLT_CH", 0),
-
-#if HIL_MODE != HIL_MODE_DISABLED
-    // @Param: HIL_SERVOS
-    // @DisplayName: HIL Servos enable
-    // @Description: This controls whether real servo controls are used in HIL mode. If you enable this then the APM will control the real servos in HIL mode. If disabled it will report servo values, but will not output to the real servos. Be careful that your motor and propeller are not connected if you enable this option.
-    // @Values: 0:Disabled,1:Enabled
-    // @User: Advanced
-    GSCALAR(hil_servos,            "HIL_SERVOS",      0),
-#endif
 
     // barometer ground calibration. The GND_ prefix is chosen for
     // compatibility with previous releases of ArduPlane
@@ -621,7 +588,7 @@ const AP_Param::Info var_info[] PROGMEM = {
 #if CAMERA == ENABLED
     // @Group: CAM_
     // @Path: ../libraries/AP_Camera/AP_Camera.cpp
-    GOBJECT(camera,                  "CAM_", AP_Camera),
+    GGROUP(camera,                  "CAM_", AP_Camera),
 #endif
 
     // RC channel
@@ -655,7 +622,7 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Path: ../libraries/RC_Channel/RC_Channel_aux.cpp, ../libraries/RC_Channel/RC_Channel.cpp
     GGROUP(rc_8,                    "RC8_", RC_Channel_aux),
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_APM2 || CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if CONFIG_APM_HARDWARE == APM_HARDWARE_APM2
     // @Group: RC9_
     // @Path: ../libraries/RC_Channel/RC_Channel_aux.cpp, ../libraries/RC_Channel/RC_Channel.cpp
     GGROUP(rc_9,                    "RC9_", RC_Channel_aux),
@@ -669,12 +636,7 @@ const AP_Param::Info var_info[] PROGMEM = {
     GGROUP(rc_11,                    "RC11_", RC_Channel_aux),
 #endif
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
-    // @Group: RC12_
-    // @Path: ../libraries/RC_Channel/RC_Channel_aux.cpp, ../libraries/RC_Channel/RC_Channel.cpp
-    GGROUP(rc_12,                    "RC12_", RC_Channel_aux),
-#endif
-
+	GGROUP(pidNavRoll,              "HDNG2RLL_",  PID),
 	GGROUP(pidNavPitchAirspeed,     "ARSP2PTCH_", PID),
 	GGROUP(pidTeThrottle,           "ENRGY2THR_", PID),
 	GGROUP(pidNavPitchAltitude,     "ALT2PTCH_",  PID),
@@ -710,10 +672,6 @@ const AP_Param::Info var_info[] PROGMEM = {
     // @Path: ../libraries/AP_Airspeed/AP_Airspeed.cpp
     GOBJECT(airspeed,                               "ARSPD_",   AP_Airspeed),
 
-    // @Group: NAVL1_
-    // @Path: ../libraries/AP_L1_Control/AP_L1_Control.cpp
-    GOBJECT(L1_controller,         "NAVL1_",   AP_L1_Control),
-
 #if MOUNT == ENABLED
     // @Group: MNT_
     // @Path: ../libraries/AP_Mount/AP_Mount.cpp
@@ -726,7 +684,7 @@ const AP_Param::Info var_info[] PROGMEM = {
     GOBJECT(camera_mount2,           "MNT2_",       AP_Mount),
 #endif
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL
+#ifdef DESKTOP_BUILD
     // @Group: SIM_
     // @Path: ../libraries/SITL/SITL.cpp
     GOBJECT(sitl, "SIM_", SITL),

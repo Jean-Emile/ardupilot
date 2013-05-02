@@ -1,3 +1,5 @@
+// agmatthews USERHOOKS
+
 void userhook_init()
 {
     // put your initialisation code here

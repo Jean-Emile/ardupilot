@@ -28,7 +28,7 @@ public:
 
     ///
     // Initializes sensor, part of public AP_ADC interface
-    void        Init();
+    void        Init(AP_PeriodicProcess*);
 
     ///
     // Read the sensor, part of public AP_ADC interface
@@ -56,8 +56,8 @@ private:
     // The raw adc array
     uint16_t        adcValue[8];
 
-    // the time in microseconds when Ch6 was last requested
-    uint32_t        _last_ch6_time;
+    // the time in milliseconds when we last got a HIL update
+    uint32_t        last_hil_time;
 
     ///
     // sensor constants

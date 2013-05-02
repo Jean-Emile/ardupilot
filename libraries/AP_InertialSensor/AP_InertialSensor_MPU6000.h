@@ -3,17 +3,15 @@
 #ifndef __AP_INERTIAL_SENSOR_MPU6000_H__
 #define __AP_INERTIAL_SENSOR_MPU6000_H__
 
+#include <string.h>
 #include <stdint.h>
-#include <AP_HAL.h>
-#include <AP_Math.h>
-#include <AP_Progmem.h>
+
+#include "../AP_PeriodicProcess/AP_PeriodicProcess.h"
+#include "../AP_Math/AP_Math.h"
 #include "AP_InertialSensor.h"
 
 #define MPU6000_CS_PIN       53        // APM pin connected to mpu6000's chip select pin
 #define DMP_FIFO_BUFFER_SIZE 72        // DMP FIFO buffer size
-
-// enable debug to see a register dump on startup
-#define MPU6000_DEBUG 0
 
 // DMP memory
 extern const uint8_t        dmpMem[8][16][16] PROGMEM;
@@ -29,6 +27,8 @@ public:
 
     /* Concrete implementation of AP_InertialSensor functions: */
     bool                update();
+    bool                new_data_available();
+    float               temperature();
     float               get_gyro_drift_rate();
 
     // push_gyro_offsets_to_dmp - updates gyro offsets in mpu6000 registers
@@ -43,28 +43,18 @@ public:
     uint16_t            num_samples_available();
 
     // get_delta_time returns the time period in seconds overwhich the sensor data was collected
-    float            	get_delta_time();
+    uint32_t            get_delta_time_micros();
 
 protected:
-    uint16_t                    _init_sensor( Sample_rate sample_rate );
+    uint16_t                    _init_sensor( AP_PeriodicProcess * scheduler, Sample_rate sample_rate );
 
 private:
 
-    static void                 _read_data_from_timerprocess();
-    static void                 _read_data_transaction();
-    static bool                 _data_ready();
-    static void                 _poll_data(uint32_t now);
-    static AP_HAL::DigitalSource *_drdy_pin;
-    static uint8_t              _register_read( uint8_t reg );
-    static bool _register_read_from_timerprocess( uint8_t reg, uint8_t *val );
+    static void                 read(uint32_t);
+    static void                 data_interrupt(void);
+    static uint8_t              register_read( uint8_t reg );
     static void                 register_write( uint8_t reg, uint8_t val );
-    void                        wait_for_sample();
-    bool                        hardware_init(Sample_rate sample_rate);
-
-    static AP_HAL::SPIDeviceDriver *_spi;
-    static AP_HAL::Semaphore *_spi_sem;
-
-    uint16_t					_num_samples;
+    void                        hardware_init(Sample_rate sample_rate);
 
     float                       _temp;
 
@@ -80,21 +70,16 @@ private:
 
     static const uint8_t        _temp_data_index;
 
+    static AP_PeriodicProcess*  _scheduler;             // pointer to scheduler so that we can suspend/resume scheduler when we pull data from the MPU6000
+
     // ensure we can't initialise twice
     bool                        _initialised;
     static int16_t              _mpu6000_product_id;
+    uint32_t					_micros_per_sample;
 
     // dmp related methods and parameters
     static void                 dmp_register_write(uint8_t bank, uint8_t address, uint8_t num_bytes, uint8_t data[]); // Method to write multiple bytes into dmp registers.  Requires a "bank"
     static void                 dmp_set_rate(uint8_t rate); // set DMP output rate (see constants)
-
-    // how many hardware samples before we report a sample to the caller
-    uint8_t _sample_shift;
-
-    // support for updating filter at runtime
-    uint8_t _last_filter_hz;
-
-    void _set_filter_register(uint8_t filter_hz, uint8_t default_filter);
 
 public:
     static Quaternion           quaternion;             // holds the 4 quaternions representing attitude taken directly from the DMP
@@ -121,10 +106,6 @@ public:
     static uint8_t              _fifoCountL;                    // low byte of number of elements in fifo buffer
 
     static bool                 _dmp_initialised;
-
-#if MPU6000_DEBUG
-    void						_dump_registers(void);
-#endif
 };
 
 #endif // __AP_INERTIAL_SENSOR_MPU6000_H__

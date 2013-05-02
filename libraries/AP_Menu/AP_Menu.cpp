@@ -4,22 +4,19 @@
 // Simple commandline menu system.
 //
 
+#include <FastSerial.h>
 #include <AP_Common.h>
-#include <AP_Progmem.h>
-#include <AP_HAL.h>
 
-#include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
+#include <avr/pgmspace.h>
 
 #include "AP_Menu.h"
-
-extern const AP_HAL::HAL& hal;
 
 // statics
 char Menu::_inbuf[MENU_COMMANDLINE_MAX];
 Menu::arg Menu::_argv[MENU_ARGS_MAX + 1];
-AP_HAL::BetterStream *Menu::_port;
+FastSerial *Menu::_port;
 
 
 // constructor
@@ -39,15 +36,15 @@ Menu::run(void)
     uint8_t len, i;
     uint8_t argc;
     int c;
-    char *s = NULL;
+    char                *s;
 
 	if (_port == NULL) {
 		// default to main serial port
-		_port = hal.console;
+		_port = &Serial;
 	}
 
     // loop performing commands
-    for (;;) {
+    for (;; ) {
 
         // run the pre-prompt function, if one is defined
         if ((NULL != _ppfunc) && !_ppfunc())
@@ -87,7 +84,6 @@ Menu::run(void)
 
         // split the input line into tokens
         argc = 0;
-		s = NULL;
         _argv[argc++].str = strtok_r(_inbuf, " ", &s);
         // XXX should an empty line by itself back out of the current menu?
         while (argc <= MENU_ARGS_MAX) {
@@ -152,7 +148,7 @@ Menu::_help(void)
 
     _port->println_P(PSTR("Commands:"));
     for (i = 0; i < _entries; i++) {
-		hal.scheduler->delay(10);
+		delay(10);
         _port->printf_P(PSTR("  %S\n"), FPSTR(_commands[i].command));
 	}
 }

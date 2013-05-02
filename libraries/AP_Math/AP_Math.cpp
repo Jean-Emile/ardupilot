@@ -8,13 +8,13 @@ float safe_asin(float v)
     if (isnan(v)) {
         return 0.0;
     }
-    if (v >= 1.0f) {
+    if (v >= 1.0) {
         return PI/2;
     }
-    if (v <= -1.0f) {
+    if (v <= -1.0) {
         return -PI/2;
     }
-    return asinf(v);
+    return asin(v);
 }
 
 // a varient of sqrt() that checks the input ranges and ensures a
@@ -24,14 +24,14 @@ float safe_asin(float v)
 // real input should have been zero
 float safe_sqrt(float v)
 {
-    float ret = sqrtf(v);
+    float ret = sqrt(v);
     if (isnan(ret)) {
         return 0;
     }
     return ret;
 }
 
-#if ROTATION_COMBINATION_SUPPORT
+
 // find a rotation that is the combination of two other
 // rotations. This is used to allow us to add an overall board
 // rotation to an existing rotation of a sensor such as the compass
@@ -51,7 +51,7 @@ enum Rotation rotation_combination(enum Rotation r1, enum Rotation r2, bool *fou
         tv2(1,2,3);
         tv2.rotate(r);
         diff = tv1 - tv2;
-        if (diff.length() < 1.0e-6f) {
+        if (diff.length() < 1.0e-6) {
             // we found a match
             if (found) {
                 *found = true;
@@ -66,53 +66,4 @@ enum Rotation rotation_combination(enum Rotation r1, enum Rotation r2, bool *fou
         *found = false;
     }
     return ROTATION_NONE;
-}
-#endif
-
-// constrain a value
-float constrain(float amt, float low, float high) 
-{
-	// the check for NaN as a float prevents propogation of
-	// floating point errors through any function that uses
-	// constrain(). The normal float semantics already handle -Inf
-	// and +Inf
-	if (isnan(amt)) {
-		return (low+high)*0.5f;
-	}
-	return ((amt)<(low)?(low):((amt)>(high)?(high):(amt)));
-}
-
-// constrain a int16_t value
-int16_t constrain_int16(int16_t amt, int16_t low, int16_t high) {
-	return ((amt)<(low)?(low):((amt)>(high)?(high):(amt)));
-}
-
-// constrain a int32_t value
-int32_t constrain_int32(int32_t amt, int32_t low, int32_t high) {
-	return ((amt)<(low)?(low):((amt)>(high)?(high):(amt)));
-}
-
-// degrees -> radians
-float radians(float deg) {
-	return deg * DEG_TO_RAD;
-}
-
-// radians -> degrees
-float degrees(float rad) {
-	return rad * RAD_TO_DEG;
-}
-
-// square
-float sq(float v) {
-	return v*v;
-}
-
-// 2D vector length
-float pythagorous2(float a, float b) {
-	return sqrtf(sq(a)+sq(b));
-}
-
-// 3D vector length
-float pythagorous3(float a, float b, float c) {
-	return sqrtf(sq(a)+sq(b)+sq(c));
 }

@@ -46,55 +46,82 @@ struct Vector2
     }
 
     // test for equality
-    bool operator ==(const Vector2<T> &v) const;
+    bool operator==(const Vector2<T> &v)
+    {
+        return (x==v.x && y==v.y);
+    }
 
     // test for inequality
-    bool operator !=(const Vector2<T> &v) const;
+    bool operator!=(const Vector2<T> &v)
+    {
+        return (x!=v.x || y!=v.y);
+    }
 
     // negation
-    Vector2<T> operator -(void) const;
+    Vector2<T> operator -(void) const
+    {
+        return Vector2<T>(-x, -y);
+    }
 
     // addition
-    Vector2<T> operator +(const Vector2<T> &v) const;
+    Vector2<T> operator +(const Vector2<T> &v) const
+    {
+        return Vector2<T>(x+v.x, y+v.y);
+    }
 
     // subtraction
-    Vector2<T> operator -(const Vector2<T> &v) const;
+    Vector2<T> operator -(const Vector2<T> &v) const
+    {
+        return Vector2<T>(x-v.x, y-v.y);
+    }
 
     // uniform scaling
-    Vector2<T> operator *(const T num) const;
+    Vector2<T> operator *(const T num) const
+    {
+        Vector2<T>        temp(*this);
+        return temp*=num;
+    }
 
     // uniform scaling
-    Vector2<T> operator  /(const T num) const;
+    Vector2<T> operator /(const T num) const
+    {
+        Vector2<T>        temp(*this);
+        return temp/=num;
+    }
 
     // addition
-    Vector2<T> &operator +=(const Vector2<T> &v);
+    Vector2<T> &operator +=(const Vector2<T> &v)
+    {
+        x+=v.x; y+=v.y;
+        return *this;
+    }
 
     // subtraction
-    Vector2<T> &operator -=(const Vector2<T> &v);
+    Vector2<T> &operator -=(const Vector2<T> &v)
+    {
+        x-=v.x; y-=v.y;
+        return *this;
+    }
 
     // uniform scaling
-    Vector2<T> &operator *=(const T num);
+    Vector2<T> &operator *=(const T num)
+    {
+        x*=num; y*=num;
+        return *this;
+    }
 
     // uniform scaling
-    Vector2<T> &operator /=(const T num);
+    Vector2<T> &operator /=(const T num)
+    {
+        x/=num; y/=num;
+        return *this;
+    }
 
     // dot product
-    T operator *(const Vector2<T> &v) const;
-
-    // cross product
-    Vector2<T> operator %(const Vector2<T> &v) const;
-
-    // computes the angle between this vector and another vector
-    float angle(const Vector2<T> &v2) const;
-
-    // computes the angle in radians between the origin and this vector
-    T angle(void) const;
-
-    // check if any elements are NAN
-    bool is_nan(void) const;
-
-    // check if any elements are infinity
-    bool is_inf(void) const;
+    T operator *(const Vector2<T> &v) const
+    {
+        return x*v.x + y*v.y;
+    }
 
     // gets the length of this vector squared
     T   length_squared() const
@@ -103,7 +130,10 @@ struct Vector2
     }
 
     // gets the length of this vector
-    float           length(void) const;
+    T   length() const
+    {
+        return (T)sqrt(*this * *this);
+    }
 
     // normalizes this vector
     void    normalize()
@@ -136,6 +166,25 @@ struct Vector2
     {
         return v * (*this * v)/(v*v);
     }
+
+    // computes the angle between 2 arbitrary vectors
+    T   angle(const Vector2<T> &v1, const Vector2<T> &v2)
+    {
+        return (T)acos((v1*v2) / (v1.length()*v2.length()));
+    }
+
+    // computes the angle between this vector and another vector
+    T   angle(const Vector2<T> &v2)
+    {
+        return (T)acos(((*this)*v2) / (this->length()*v2.length()));
+    }
+
+    // computes the angle between 2 normalized arbitrary vectors
+    T   angle_normalized(const Vector2<T> &v1, const Vector2<T> &v2)
+    {
+        return (T)acos(v1*v2);
+    }
+
 };
 
 typedef Vector2<int16_t>        Vector2i;

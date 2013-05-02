@@ -17,11 +17,10 @@
 #define __AP_MENU_H__
 
 #include <inttypes.h>
-#include <AP_HAL.h>
 
 #define MENU_COMMANDLINE_MAX    32      ///< maximum input line length
-#define MENU_ARGS_MAX           3       ///< maximum number of arguments
-#define MENU_COMMAND_MAX        14      ///< maximum size of a command name
+#define MENU_ARGS_MAX                   4       ///< maximum number of arguments
+#define MENU_COMMAND_MAX                14      ///< maximum size of a command name
 
 /// Class defining and handling one menu tree
 class Menu {
@@ -57,7 +56,7 @@ public:
     ///
     typedef int8_t (*func)(uint8_t argc, const struct arg *argv);
 
-	static void set_port(AP_HAL::BetterStream *port) {
+	static void set_port(FastSerial *port) {
 		_port = port;
 	}
 
@@ -127,7 +126,7 @@ private:
     static arg              _argv[MENU_ARGS_MAX + 1];                   ///< arguments
 
 	// port to run on
-	static AP_HAL::BetterStream  *_port;
+	static FastSerial       *_port;
 };
 
 /// Macros used to define a menu.

@@ -4,44 +4,56 @@
 // Simple test for the AP_AHRS interface
 //
 
-#include <AP_HAL.h>
-#include <AP_Common.h>
-#include <AP_Progmem.h>
-#include <AP_Math.h>
-#include <AP_Param.h>
+#include <FastSerial.h>
+#include <SPI.h>
+#include <I2C.h>
+#include <Arduino_Mega_ISR_Registry.h>
+#include <AP_PeriodicProcess.h>
 #include <AP_InertialSensor.h>
 #include <AP_ADC.h>
 #include <AP_GPS.h>
 #include <AP_AHRS.h>
+#include <AP_Math.h>
+#include <AP_AnalogSource.h>
+#include <AP_AnalogSource_Arduino.h>
+#include <AP_Common.h>
 #include <AP_Compass.h>
-#include <AP_Declination.h>
 #include <AP_Airspeed.h>
 #include <AP_Baro.h>
+#include <AP_Semaphore.h>
+#include <DataFlash.h>
+#include <APM_RC.h>
 #include <GCS_MAVLink.h>
 #include <Filter.h>
-#include <SITL.h>
 #include <AP_Buffer.h>
 
-#include <AP_HAL_AVR.h>
-#include <AP_HAL_AVR_SITL.h>
-#include <AP_HAL_Empty.h>
+// uncomment this for a APM2 board
+#define APM2_HARDWARE
 
-const AP_HAL::HAL& hal = AP_HAL_BOARD_DRIVER;
+#define WITH_GPS 0
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_APM2
-AP_InertialSensor_MPU6000 ins;
-#elif CONFIG_HAL_BOARD == HAL_BOARD_APM1
-AP_ADC_ADS7844 adc;
-AP_InertialSensor_Oilpan ins( &adc );
+FastSerialPort0(Serial);
+FastSerialPort1(Serial1);
+
+Arduino_Mega_ISR_Registry isr_registry;
+AP_TimerProcess scheduler;
+
+#ifdef DESKTOP_BUILD
+AP_Compass_HIL compass;
 #else
-AP_InertialSensor_Stub ins;
+AP_Compass_HMC5843 compass;
 #endif
 
-AP_Compass_HMC5843 compass;
+#ifdef APM2_HARDWARE
+AP_InertialSensor_MPU6000 ins;
+# else
+AP_ADC_ADS7844 adc;
+AP_InertialSensor_Oilpan ins( &adc );
+#endif
 
-GPS *g_gps;
+static GPS         *g_gps;
 
-AP_GPS_Auto g_gps_driver(&g_gps);
+AP_GPS_Auto     g_gps_driver(&Serial1, &g_gps);
 
 // choose which AHRS system to use
 AP_AHRS_DCM  ahrs(&ins, g_gps);
@@ -50,10 +62,7 @@ AP_AHRS_DCM  ahrs(&ins, g_gps);
 AP_Baro_BMP085_HIL barometer;
 
 
-#define HIGH 1
-#define LOW 0
-
-#if CONFIG_HAL_BOARD == HAL_BOARD_APM2
+#ifdef APM2_HARDWARE
  # define A_LED_PIN        27
  # define C_LED_PIN        25
  # define LED_ON           LOW
@@ -70,36 +79,50 @@ AP_Baro_BMP085_HIL barometer;
 
 static void flash_leds(bool on)
 {
-    hal.gpio->write(A_LED_PIN, on ? LED_OFF : LED_ON);
-    hal.gpio->write(C_LED_PIN, on ? LED_ON : LED_OFF);
+    digitalWrite(A_LED_PIN, on ? LED_OFF : LED_ON);
+    digitalWrite(C_LED_PIN, on ? LED_ON : LED_OFF);
 }
 
 void setup(void)
 {
+    Serial.begin(115200);
+    Serial.println("Starting up...");
+
+#ifndef DESKTOP_BUILD
+    I2c.begin();
+    I2c.timeOut(5);
+    I2c.setSpeed(true);
+#endif
+
+    SPI.begin();
+    SPI.setClockDivider(SPI_CLOCK_DIV16);
 
 #ifdef APM2_HARDWARE
     // we need to stop the barometer from holding the SPI bus
-    hal.gpio->pinMode(40, GPIO_OUTPUT);
-    hal.gpio->write(40, HIGH);
+    pinMode(40, OUTPUT);
+    digitalWrite(40, HIGH);
 #endif
+
+    isr_registry.init();
+    scheduler.init(&isr_registry);
 
     ins.init(AP_InertialSensor::COLD_START, 
 			 AP_InertialSensor::RATE_100HZ,
-			 flash_leds);
-    ins.init_accel(flash_leds);
+			 delay, flash_leds, &scheduler);
+    ins.init_accel(delay, flash_leds);
 
     compass.set_orientation(MAG_ORIENTATION);
     ahrs.init();
 
     if( compass.init() ) {
-        hal.console->printf("Enabling compass\n");
+        Serial.printf("Enabling compass\n");
         ahrs.set_compass(&compass);
     } else {
-        hal.console->printf("No compass detected\n");
+        Serial.printf("No compass detected\n");
     }
     g_gps = &g_gps_driver;
 #if WITH_GPS
-    g_gps->init(hal.uartB);
+    g_gps->init();
 #endif
 }
 
@@ -107,7 +130,7 @@ void loop(void)
 {
     static uint16_t counter;
     static uint32_t last_t, last_print, last_compass;
-    uint32_t now = hal.scheduler->micros();
+    uint32_t now = micros();
     float heading = 0;
 
     if (last_t == 0) {
@@ -129,11 +152,9 @@ void loop(void)
     ahrs.update();
     counter++;
 
-    if (now - last_print >= 100000 /* 100ms : 10hz */) {
+    if (now - last_print >= 0.5e6) {
         Vector3f drift  = ahrs.get_gyro_drift();
-        hal.console->printf_P(
-                PSTR("r:%4.1f  p:%4.1f y:%4.1f "
-                    "drift=(%5.1f %5.1f %5.1f) hdg=%.1f rate=%.1f\n"),
+        Serial.printf_P(PSTR("r:%4.1f  p:%4.1f y:%4.1f drift=(%5.1f %5.1f %5.1f) hdg=%.1f rate=%.1f\n"),
                         ToDeg(ahrs.roll),
                         ToDeg(ahrs.pitch),
                         ToDeg(ahrs.yaw),
@@ -146,5 +167,3 @@ void loop(void)
         counter = 0;
     }
 }
-
-AP_HAL_MAIN();

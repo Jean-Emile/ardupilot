@@ -1,6 +1,6 @@
 import math
 from math import sqrt, acos, cos, pi, sin, atan2
-import os, sys, time, random
+import os, pexpect, sys, time, random
 from rotmat import Vector3, Matrix3
 from subprocess import call, check_call,Popen, PIPE
 
@@ -69,7 +69,6 @@ def build_AVR(atype, board='mega2560'):
     '''build AVR binaries'''
     config = open(reltopdir('config.mk'), mode='w')
     config.write('''
-HAL_BOARD=HAL_BOARD_APM1
 BOARD=%s
 PORT=/dev/null
 ''' % board)
@@ -110,24 +109,21 @@ def pexpect_close_all():
 
 def pexpect_drain(p):
     '''drain any pending input'''
-    import pexpect
     try:
         p.read_nonblocking(1000, timeout=0)
     except pexpect.TIMEOUT:
         pass
 
-def start_SIL(atype, valgrind=False, wipe=False, height=None):
+def start_SIL(atype, valgrind=False, wipe=False, CLI=False, height=None):
     '''launch a SIL instance'''
-    import pexpect
     cmd=""
     if valgrind and os.path.exists('/usr/bin/valgrind'):
         cmd += 'valgrind -q --log-file=%s-valgrind.log ' % atype
-    executable = reltopdir('tmp/%s.build/%s.elf' % (atype, atype))
-    if not os.path.exists(executable):
-        executable = '/tmp/%s.build/%s.elf' % (atype, atype)
-    cmd += executable
+    cmd += reltopdir('tmp/%s.build/%s.elf' % (atype, atype))
     if wipe:
         cmd += ' -w'
+    if CLI:
+        cmd += ' -s'
     if height is not None:
         cmd += ' -H %u' % height
     ret = pexpect.spawn(cmd, logfile=sys.stdout, timeout=5)
@@ -139,7 +135,6 @@ def start_SIL(atype, valgrind=False, wipe=False, height=None):
 def start_MAVProxy_SIL(atype, aircraft=None, setup=False, master='tcp:127.0.0.1:5760',
                        options=None, logfile=sys.stdout):
     '''launch mavproxy connected to a SIL instance'''
-    import pexpect
     global close_list
     MAVPROXY = os.getenv('MAVPROXY_CMD', reltopdir('../MAVProxy/mavproxy.py'))
     cmd = MAVPROXY + ' --master=%s --out=127.0.0.1:14550' % master
@@ -159,7 +154,6 @@ def start_MAVProxy_SIL(atype, aircraft=None, setup=False, master='tcp:127.0.0.1:
 def expect_setup_callback(e, callback):
     '''setup a callback that is called once a second while waiting for
        patterns'''
-    import pexpect
     def _expect_callback(pattern, timeout=e.timeout):
         tstart = time.time()
         while time.time() < tstart + timeout:
@@ -205,15 +199,8 @@ def lock_file(fname):
         return None
     return f
 
-def check_parent(parent_pid=None):
+def check_parent(parent_pid=os.getppid()):
     '''check our parent process is still alive'''
-    if parent_pid is None:
-        try:
-            parent_pid = os.getppid()
-        except Exception:
-            pass
-    if parent_pid is None:
-        return
     try:
         os.kill(parent_pid, 0)
     except Exception:

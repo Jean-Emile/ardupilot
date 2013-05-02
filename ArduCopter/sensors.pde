@@ -3,20 +3,24 @@
 // Sensors are not available in HIL_MODE_ATTITUDE
 #if HIL_MODE != HIL_MODE_ATTITUDE
 
+static void ReadSCP1000(void) {
+}
+
  #if CONFIG_SONAR == ENABLED
 static void init_sonar(void)
 {
   #if CONFIG_SONAR_SOURCE == SONAR_SOURCE_ADC
-    sonar->calculate_scaler(g.sonar_type, 3.3f);
+    sonar.calculate_scaler(g.sonar_type, 3.3);
   #else
-    sonar->calculate_scaler(g.sonar_type, 5.0f);
+    sonar.calculate_scaler(g.sonar_type, 5.0);
   #endif
 }
  #endif
 
 static void init_barometer(void)
 {
-    barometer.calibrate();
+    barometer.calibrate(mavlink_delay);
+    ahrs.set_barometer(&barometer);
     gcs_send_text_P(SEVERITY_LOW, PSTR("barometer calibration complete"));
 }
 
@@ -24,7 +28,7 @@ static void init_barometer(void)
 static int32_t read_barometer(void)
 {
     barometer.read();
-    return barometer.get_altitude() * 100.0f;
+    return baro_filter.apply(barometer.get_altitude() * 100.0);
 }
 
 // return sonar altitude in centimeters
@@ -37,10 +41,10 @@ static int16_t read_sonar(void)
         return 0;
     }
 
-    int16_t temp_alt = sonar->read();
+    int16_t temp_alt = sonar.read();
 
-    if (temp_alt >= sonar->min_distance && temp_alt <= sonar->max_distance * 0.70f) {
-        if ( sonar_alt_health < SONAR_ALT_HEALTH_MAX ) {
+    if(temp_alt >= sonar.min_distance && temp_alt <= sonar.max_distance * 0.70) {
+        if( sonar_alt_health < SONAR_ALT_HEALTH_MAX ) {
             sonar_alt_health++;
         }
     }else{
@@ -50,7 +54,7 @@ static int16_t read_sonar(void)
  #if SONAR_TILT_CORRECTION == 1
     // correct alt for angle of the sonar
     float temp = cos_pitch_x * cos_roll_x;
-    temp = max(temp, 0.707f);
+    temp = max(temp, 0.707);
     temp_alt = (float)temp_alt * temp;
  #endif
 
@@ -81,13 +85,13 @@ static void init_compass()
 static void init_optflow()
 {
 #if OPTFLOW == ENABLED
-    if( optflow.init() == false ) {
+    if( optflow.init(false, &timer_scheduler, &spi_semaphore, &spi3_semaphore) == false ) {
         g.optflow_enabled = false;
         cliSerial->print_P(PSTR("\nFailed to Init OptFlow "));
         Log_Write_Error(ERROR_SUBSYSTEM_OPTFLOW,ERROR_CODE_FAILED_TO_INITIALISE);
     }else{
         // suspend timer while we set-up SPI communication
-        hal.scheduler->suspend_timer_procs();
+        timer_scheduler.suspend_timer();
 
         optflow.set_orientation(OPTFLOW_ORIENTATION);   // set optical flow sensor's orientation on aircraft
         optflow.set_frame_rate(2000);                   // set minimum update rate (which should lead to maximum low light performance
@@ -95,7 +99,7 @@ static void init_optflow()
         optflow.set_field_of_view(OPTFLOW_FOV);         // set optical flow sensor's field of view
 
         // resume timer
-        hal.scheduler->resume_timer_procs();
+        timer_scheduler.resume_timer();
     }
 #endif      // OPTFLOW == ENABLED
 }
@@ -107,26 +111,25 @@ static void read_battery(void)
 {
     static uint8_t low_battery_counter = 0;
 
-    if(g.battery_monitoring == BATT_MONITOR_DISABLED) {
+    if(g.battery_monitoring == 0) {
         battery_voltage1 = 0;
         return;
     }
 
-    if(g.battery_monitoring == BATT_MONITOR_VOLTAGE_ONLY || g.battery_monitoring == BATT_MONITOR_VOLTAGE_AND_CURRENT) {
-        batt_volt_analog_source->set_pin(g.battery_volt_pin);
-        battery_voltage1 = BATTERY_VOLTAGE(batt_volt_analog_source);
+    if(g.battery_monitoring == 3 || g.battery_monitoring == 4) {
+        static AP_AnalogSource_Arduino batt_volt_pin(g.battery_volt_pin);
+        batt_volt_pin.set_pin(g.battery_volt_pin);
+        battery_voltage1 = BATTERY_VOLTAGE(batt_volt_pin.read_average());
     }
-    if(g.battery_monitoring == BATT_MONITOR_VOLTAGE_AND_CURRENT) {
-        batt_curr_analog_source->set_pin(g.battery_curr_pin);
-        current_amps1    = CURRENT_AMPS(batt_curr_analog_source);
-        current_total1   += current_amps1 * 0.02778f;            // called at 100ms on average, .0002778 is 1/3600 (conversion to hours)
-
-        // update compass with current value
-        compass.set_current(current_amps1);
+    if(g.battery_monitoring == 4) {
+        static AP_AnalogSource_Arduino batt_curr_pin(g.battery_curr_pin);
+        batt_curr_pin.set_pin(g.battery_curr_pin);
+        current_amps1    = CURRENT_AMPS(batt_curr_pin.read_average());
+        current_total1   += current_amps1 * 0.02778;            // called at 100ms on average, .0002778 is 1/3600 (conversion to hours)
     }
 
     // check for low voltage or current if the low voltage check hasn't already been triggered
-    if (!ap.low_battery && ( battery_voltage1 < g.low_voltage || (g.battery_monitoring == BATT_MONITOR_VOLTAGE_AND_CURRENT && current_total1 > g.pack_capacity))) {
+    if (!ap.low_battery && ( battery_voltage1 < g.low_voltage || (g.battery_monitoring == 4 && current_total1 > g.pack_capacity))) {
         low_battery_counter++;
         if( low_battery_counter >= BATTERY_FS_COUNTER ) {
             low_battery_counter = BATTERY_FS_COUNTER;   // ensure counter does not overflow
@@ -142,7 +145,7 @@ static void read_battery(void)
 // RC_CHANNELS_SCALED message
 void read_receiver_rssi(void)
 {
-    rssi_analog_source->set_pin(g.rssi_pin);
-    float ret = rssi_analog_source->read_latest();
-    receiver_rssi = constrain_int16(ret, 0, 255);
+    RSSI_pin.set_pin(g.rssi_pin);
+    float ret = RSSI_pin.read();
+    receiver_rssi = constrain(ret, 0, 255);
 }

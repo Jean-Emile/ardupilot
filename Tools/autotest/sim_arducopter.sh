@@ -1,28 +1,24 @@
 #!/bin/bash
 
-killall -q ArduCopter.elf
-pkill -f sim_multicopter.py
-
 set -e
 set -x
 
-target=sitl
-frame="+"
-
-if [ $# -gt 0 ]; then
-    case $1 in
-	+|X|quad)
-	    target="sitl"
-	    frame="$1"
-	    shift
-	    ;;
-	octa)
-	    target="sitl-octa"
-	    frame="$1"
-	    shift
-	    ;;
-    esac
+if [ $# -eq 1 ]; then
+    frame="$1"
+    target="sitl-$frame"
+else
+    frame="+"
+    target="sitl"
 fi
+
+case $frame in
+    +,X,quad)
+	target="sitl"
+	;;
+    octa)
+	target="sitl-octa"
+	;;
+esac
 
 echo "Building with target $target for frame $frame"
 
@@ -40,4 +36,4 @@ rm -f $tfile
 gnome-terminal -e "../Tools/autotest/pysim/sim_multicopter.py --frame=$frame --home=-35.362938,149.165085,584,270"
 sleep 2
 popd
-mavproxy.py --master tcp:127.0.0.1:5760 --sitl 127.0.0.1:5501 --out 127.0.0.1:14550 --out 127.0.0.1:14551 --quadcopter $*
+mavproxy.py --master tcp:127.0.0.1:5760 --sitl 127.0.0.1:5501 --out 127.0.0.1:14550 --out 127.0.0.1:14551 --quadcopter

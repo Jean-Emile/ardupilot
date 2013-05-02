@@ -1,5 +1,5 @@
-#ifndef __AP_AHRS_DCM_H__
-#define __AP_AHRS_DCM_H__
+#ifndef AP_AHRS_DCM_H
+#define AP_AHRS_DCM_H
 /*
  *  DCM based AHRS (Attitude Heading Reference System) interface for
  *  ArduPilot
@@ -25,15 +25,15 @@ public:
     }
 
     // return the smoothed gyro vector corrected for drift
-    const Vector3f get_gyro(void) const {
+    Vector3f        get_gyro(void) {
         return _omega + _omega_P + _omega_yaw_P;
     }
-    const Matrix3f &get_dcm_matrix(void) const {
+    Matrix3f        get_dcm_matrix(void) {
         return _dcm_matrix;
     }
 
     // return the current drift correction integrator value
-    const Vector3f &get_gyro_drift(void) const {
+    Vector3f        get_gyro_drift(void) {
         return _omega_I;
     }
 
@@ -56,8 +56,6 @@ public:
     // return an airspeed estimate if available. return true
     // if we have an estimate
     bool airspeed_estimate(float *airspeed_ret);
-
-    bool            use_compass(void);
 
 private:
     float _ki;
@@ -138,4 +136,4 @@ private:
     Vector3f _wind;
 };
 
-#endif // __AP_AHRS_DCM_H__
+#endif // AP_AHRS_DCM_H

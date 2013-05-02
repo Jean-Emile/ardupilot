@@ -11,13 +11,22 @@
 //	GPS configuration : Custom protocol per "DIYDrones Custom Binary Sentence Specification V1.1"
 //
 
-#include <AP_HAL.h>
 #include "AP_GPS_HIL.h"
+#if defined(ARDUINO) && ARDUINO >= 100
+ #include "Arduino.h"
+#else
+ #include "WProgram.h"
+#endif
+
+// Constructors ////////////////////////////////////////////////////////////////
+AP_GPS_HIL::AP_GPS_HIL(Stream *s) : GPS(s)
+{
+}
 
 // Public Methods //////////////////////////////////////////////////////////////
-void AP_GPS_HIL::init(AP_HAL::UARTDriver *s, enum GPS_Engine_Setting nav_setting)
+void AP_GPS_HIL::init(enum GPS_Engine_Setting nav_setting)
 {
-	_port = s;
+    idleTimeout = 1200;
 }
 
 bool AP_GPS_HIL::read(void)
@@ -32,15 +41,15 @@ bool AP_GPS_HIL::read(void)
 void AP_GPS_HIL::setHIL(uint32_t _time, float _latitude, float _longitude, float _altitude,
                         float _ground_speed, float _ground_course, float _speed_3d, uint8_t _num_sats)
 {
-    time                = _time;
-    latitude            = _latitude*1.0e7f;
-    longitude           = _longitude*1.0e7f;
-    altitude            = _altitude*1.0e2f;
-    ground_speed        = _ground_speed*1.0e2f;
-    ground_course       = _ground_course*1.0e2f;
-    speed_3d            = _speed_3d*1.0e2f;
+    time                        = _time;
+    latitude            = _latitude*1.0e7;
+    longitude           = _longitude*1.0e7;
+    altitude            = _altitude*1.0e2;
+    ground_speed        = _ground_speed*1.0e2;
+    ground_course       = _ground_course*1.0e2;
+    speed_3d            = _speed_3d*1.0e2;
     num_sats            = _num_sats;
-    fix                 = FIX_3D;
+    fix                         = true;
     new_data            = true;
     _updated            = true;
 }

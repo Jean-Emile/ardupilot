@@ -9,12 +9,11 @@
 /// @file	Derivative.cpp
 /// @brief	A class to implement a derivative (slope) filter
 /// See http://www.holoborodko.com/pavel/numerical-methods/numerical-derivative/smooth-low-noise-differentiators/
-//
+
+#include <FastSerial.h>
 #include <inttypes.h>
-#include <AP_Math.h>
 #include <Filter.h>
 #include <DerivativeFilter.h>
-
 
 template <class T,  uint8_t FILTER_SIZE>
 void DerivativeFilter<T,FILTER_SIZE>::update(T sample, uint32_t timestamp)

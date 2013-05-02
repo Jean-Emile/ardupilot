@@ -1,1 +1,1 @@
-include ../../../../mk/apm.mk
+include ../../../AP_Common/Arduino.mk

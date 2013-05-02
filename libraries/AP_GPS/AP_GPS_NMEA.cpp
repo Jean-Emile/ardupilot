@@ -25,12 +25,12 @@
 /// TinyGPS parser by Mikal Hart.
 ///
 
+#include <FastSerial.h>
 #include <AP_Common.h>
 
-#include <AP_Progmem.h>
+#include <avr/pgmspace.h>
 #include <ctype.h>
 #include <stdint.h>
-#include <stdlib.h>
 
 #include "AP_GPS_NMEA.h"
 
@@ -90,19 +90,27 @@ const char AP_GPS_NMEA::_gpvtg_string[] PROGMEM = "GPVTG";
 //
 #define DIGIT_TO_VAL(_x)        (_x - '0')
 
-// Public Methods //////////////////////////////////////////////////////////////
-void AP_GPS_NMEA::init(AP_HAL::UARTDriver *s, enum GPS_Engine_Setting nav_setting)
+// Constructors ////////////////////////////////////////////////////////////////
+AP_GPS_NMEA::AP_GPS_NMEA(Stream *s) :
+    GPS(s)
 {
-	_port = s;
+}
+
+// Public Methods //////////////////////////////////////////////////////////////
+void AP_GPS_NMEA::init(enum GPS_Engine_Setting nav_setting)
+{
+    BetterStream        *bs = (BetterStream *)_port;
 
     // send the SiRF init strings
-    _port->print_P((const prog_char_t *)_SiRF_init_string);
+    bs->print_P((const prog_char_t *)_SiRF_init_string);
 
     // send the MediaTek init strings
-    _port->print_P((const prog_char_t *)_MTK_init_string);
+    bs->print_P((const prog_char_t *)_MTK_init_string);
 
     // send the ublox init strings
-    _port->print_P((const prog_char_t *)_ublox_init_string);
+    bs->print_P((const prog_char_t *)_ublox_init_string);
+
+    idleTimeout = 1200;
 }
 
 bool AP_GPS_NMEA::read(void)
@@ -243,7 +251,7 @@ bool AP_GPS_NMEA::_term_complete()
                     longitude           = _new_longitude * 10;  // degrees*10e5 -> 10e7
                     ground_speed        = _new_speed;
                     ground_course       = _new_course;
-                    fix                 = GPS::FIX_3D;          // To-Do: add support for proper reporting of 2D and 3D fix
+                    fix                         = true;
                     break;
                 case _GPS_SENTENCE_GPGGA:
                     altitude            = _new_altitude;
@@ -252,7 +260,7 @@ bool AP_GPS_NMEA::_term_complete()
                     longitude           = _new_longitude * 10;  // degrees*10e5 -> 10e7
                     num_sats            = _new_satellite_count;
                     hdop                        = _new_hdop;
-                    fix                 = GPS::FIX_3D;          // To-Do: add support for proper reporting of 2D and 3D fix
+                    fix                         = true;
                     break;
                 case _GPS_SENTENCE_GPVTG:
                     ground_speed        = _new_speed;
@@ -266,7 +274,7 @@ bool AP_GPS_NMEA::_term_complete()
                 case _GPS_SENTENCE_GPGGA:
                     // Only these sentences give us information about
                     // fix status.
-                    fix = GPS::FIX_NONE;
+                    fix = false;
                 }
             }
             // we got a good message

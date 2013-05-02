@@ -8,34 +8,34 @@
 //	License as published by the Free Software Foundation; either
 //	version 2.1 of the License, or (at your option) any later version.
 //
-#include <stdint.h>
-
-#include <AP_HAL.h>
 
 #define UBLOX_DEBUGGING 0
 
-extern const AP_HAL::HAL& hal;
+#include <FastSerial.h>
 
 #if UBLOX_DEBUGGING
- # define Debug(fmt, args ...)  do {hal.console->printf("%s:%d: " fmt "\n", __FUNCTION__, __LINE__, ## args); hal.scheduler->delay(1); } while(0)
+ # define Debug(fmt, args ...)  do {Serial.printf("%s:%d: " fmt "\n", __FUNCTION__, __LINE__, ## args); delay(0); } while(0)
 #else
  # define Debug(fmt, args ...)
 #endif
 
 #include "AP_GPS_UBLOX.h"
-
-extern const AP_HAL::HAL& hal;
+#include <stdint.h>
 
 const prog_char AP_GPS_UBLOX::_ublox_set_binary[] PROGMEM = UBLOX_SET_BINARY;
 const uint8_t AP_GPS_UBLOX::_ublox_set_binary_size = sizeof(AP_GPS_UBLOX::_ublox_set_binary);
 
+// Constructors ////////////////////////////////////////////////////////////////
+
+AP_GPS_UBLOX::AP_GPS_UBLOX(Stream *s) : GPS(s)
+{
+}
+
 // Public Methods //////////////////////////////////////////////////////////////
 
 void
-AP_GPS_UBLOX::init(AP_HAL::UARTDriver *s, enum GPS_Engine_Setting nav_setting)
+AP_GPS_UBLOX::init(enum GPS_Engine_Setting nav_setting)
 {
-	_port = s;
-
     // XXX it might make sense to send some CFG_MSG,CFG_NMEA messages to get the
     // right reporting configuration.
 
@@ -44,14 +44,12 @@ AP_GPS_UBLOX::init(AP_HAL::UARTDriver *s, enum GPS_Engine_Setting nav_setting)
     _port->flush();
 
     _epoch = TIME_OF_WEEK;
+    idleTimeout = 1200;
 
     // configure the GPS for the messages we want
     _configure_gps();
 
     _nav_setting = nav_setting;
-	_step = 0;
-	_new_position = false;
-	_new_speed = false;
 }
 
 // Process bytes available from the stream
@@ -76,7 +74,6 @@ AP_GPS_UBLOX::read(void)
         // read the next byte
         data = _port->read();
 
-	reset:
         switch(_step) {
 
         // Message preamble detection
@@ -135,7 +132,6 @@ AP_GPS_UBLOX::read(void)
                 // assume very large payloads are line noise
                 _payload_length = 0;
                 _step = 0;
-				goto reset;
             }
             _payload_counter = 0;                               // prepare to receive payload
             break;
@@ -157,8 +153,7 @@ AP_GPS_UBLOX::read(void)
             _step++;
             if (_ck_a != data) {
                 Debug("bad cka %x should be %x", data, _ck_a);
-                _step = 0;
-				goto reset;
+                _step = 0;                                              // bad checksum
             }
             break;
         case 8:
@@ -222,43 +217,25 @@ AP_GPS_UBLOX::_parse_gps(void)
         longitude       = _buffer.posllh.longitude;
         latitude        = _buffer.posllh.latitude;
         altitude        = _buffer.posllh.altitude_msl / 10;
-        fix             = next_fix;
+        fix                     = next_fix;
         _new_position = true;
         break;
     case MSG_STATUS:
         Debug("MSG_STATUS fix_status=%u fix_type=%u",
               _buffer.status.fix_status,
               _buffer.status.fix_type);
-        if (_buffer.status.fix_status & NAV_STATUS_FIX_VALID) {
-            if( _buffer.status.fix_type == AP_GPS_UBLOX::FIX_3D) {
-                next_fix = GPS::FIX_3D;
-            }else if (_buffer.status.fix_type == AP_GPS_UBLOX::FIX_2D) {
-                next_fix = GPS::FIX_2D;
-            }else{
-                next_fix = GPS::FIX_NONE;
-                fix = GPS::FIX_NONE;
-            }
-        }else{
-            next_fix = GPS::FIX_NONE;
-            fix = GPS::FIX_NONE;
+        next_fix        = (_buffer.status.fix_status & NAV_STATUS_FIX_VALID) && (_buffer.status.fix_type == FIX_3D);
+        if (!next_fix) {
+            fix = false;
         }
         break;
     case MSG_SOL:
         Debug("MSG_SOL fix_status=%u fix_type=%u",
               _buffer.solution.fix_status,
               _buffer.solution.fix_type);
-        if (_buffer.solution.fix_status & NAV_STATUS_FIX_VALID) {
-            if( _buffer.solution.fix_type == AP_GPS_UBLOX::FIX_3D) {
-                next_fix = GPS::FIX_3D;
-            }else if (_buffer.solution.fix_type == AP_GPS_UBLOX::FIX_2D) {
-                next_fix = GPS::FIX_2D;
-            }else{
-                next_fix = GPS::FIX_NONE;
-                fix = GPS::FIX_NONE;
-            }
-        }else{
-            next_fix = GPS::FIX_NONE;
-            fix = GPS::FIX_NONE;
+        next_fix        = (_buffer.solution.fix_status & NAV_STATUS_FIX_VALID) && (_buffer.solution.fix_type == FIX_3D);
+        if (!next_fix) {
+            fix = false;
         }
         num_sats        = _buffer.solution.satellites;
         hdop            = _buffer.solution.position_DOP;
@@ -361,17 +338,16 @@ AP_GPS_UBLOX::_configure_gps(void)
 {
     struct ubx_cfg_nav_rate msg;
     const unsigned baudrates[4] = {9600U, 19200U, 38400U, 57600U};
+    FastSerial *_fs = (FastSerial *)_port;
 
     // the GPS may be setup for a different baud rate. This ensures
     // it gets configured correctly
     for (uint8_t i=0; i<4; i++) {
-        _port->begin(baudrates[i]);
-        _write_progstr_block(_port, _ublox_set_binary, _ublox_set_binary_size);
-        while (_port->tx_pending()) {
-          hal.scheduler->delay(1);
-        }
+        _fs->begin(baudrates[i]);
+        _write_progstr_block(_fs, _ublox_set_binary, _ublox_set_binary_size);
+        while (_fs->tx_pending()) delay(1);
     }
-    _port->begin(38400U);
+    _fs->begin(38400U);
 
     // ask for navigation solutions every 200ms
     msg.measure_rate_ms = 200;
@@ -402,7 +378,6 @@ AP_GPS_UBLOX::_detect(uint8_t data)
 	static uint8_t step;
 	static uint8_t ck_a, ck_b;
 
-reset:
 	switch (step) {
         case 1:
             if (PREAMBLE2 == data) {
@@ -441,7 +416,6 @@ reset:
             step++;
             if (ck_a != data) {
                 step = 0;
-				goto reset;
             }
             break;
         case 8:
@@ -449,8 +423,6 @@ reset:
 			if (ck_b == data) {
 				// a valid UBlox packet
 				return true;
-			} else {
-				goto reset;
 			}
     }
     return false;

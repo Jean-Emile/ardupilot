@@ -5,7 +5,7 @@ static void read_control_switch()
 {
     static uint8_t switch_counter = 0;
 
-    uint8_t switchPosition = readSwitch();
+    byte switchPosition = readSwitch();
 
     if (oldSwitchPosition != switchPosition) {
         switch_counter++;
@@ -14,13 +14,13 @@ static void read_control_switch()
             switch_counter          = 0;
 
             // ignore flight mode changes if in failsafe
-            if( !ap.failsafe_radio ) {
+            if( !ap.failsafe ) {
                 set_mode(flight_modes[switchPosition]);
 
                 if(g.ch7_option != CH7_SIMPLE_MODE) {
                     // set Simple mode using stored paramters from Mission planner
                     // rather than by the control switch
-                    set_simple_mode(BIT_IS_SET(g.simple_modes, switchPosition));
+                    set_simple_mode(g.simple_modes & (1 << switchPosition));
                 }
             }
         }
@@ -31,15 +31,15 @@ static void read_control_switch()
     }
 }
 
-static uint8_t readSwitch(void){
-    int16_t pulsewidth = g.rc_5.radio_in;   // default for Arducopter
+static byte readSwitch(void){
+    int16_t pulsewidth = g.rc_5.radio_in;                       // default for Arducopter
 
-    if (pulsewidth < 1231) return 0;
-    if (pulsewidth < 1361) return 1;
-    if (pulsewidth < 1491) return 2;
-    if (pulsewidth < 1621) return 3;
-    if (pulsewidth < 1750) return 4;        // Software Manual
-    return 5;                               // Hardware Manual
+    if (pulsewidth > 1230 && pulsewidth <= 1360) return 1;
+    if (pulsewidth > 1360 && pulsewidth <= 1490) return 2;
+    if (pulsewidth > 1490 && pulsewidth <= 1620) return 3;
+    if (pulsewidth > 1620 && pulsewidth <= 1749) return 4;
+    if (pulsewidth >= 1750) return 5;
+    return 0;
 }
 
 static void reset_control_switch()
@@ -139,7 +139,7 @@ static void read_trim_switch()
 
                 // set the next_WP (home is stored at 0)
                 // max out at 100 since I think we need to stay under the EEPROM limit
-                CH7_wp_index = constrain_int16(CH7_wp_index, 1, 100);
+                CH7_wp_index = constrain(CH7_wp_index, 1, 100);
 
                 if(g.rc_3.control_in > 0) {
                     // set our location ID to 16, MAV_CMD_NAV_WAYPOINT
@@ -169,13 +169,6 @@ static void read_trim_switch()
             // enable or disable the sonar
             g.sonar_enabled = ap_system.CH7_flag;
             break;
-
-#if AC_FENCE == ENABLED
-        case CH7_FENCE:
-            // enable or disable the fence
-            fence.enable(ap_system.CH7_flag);
-            break;
-#endif
     }
 }
 
@@ -183,8 +176,8 @@ static void read_trim_switch()
 static void save_trim()
 {
     // save roll and pitch trim
-    float roll_trim = ToRad((float)g.rc_1.control_in/100.0f);
-    float pitch_trim = ToRad((float)g.rc_2.control_in/100.0f);
+    float roll_trim = ToRad((float)g.rc_1.control_in/100.0);
+    float pitch_trim = ToRad((float)g.rc_2.control_in/100.0);
     ahrs.add_trim(roll_trim, pitch_trim);
 }
 
@@ -199,10 +192,10 @@ static void auto_trim()
         led_mode = SAVE_TRIM_LEDS;
 
         // calculate roll trim adjustment
-        float roll_trim_adjustment = ToRad((float)g.rc_1.control_in / 4000.0f);
+        float roll_trim_adjustment = ToRad((float)g.rc_1.control_in / 4000.0);
 
         // calculate pitch trim adjustment
-        float pitch_trim_adjustment = ToRad((float)g.rc_2.control_in / 4000.0f);
+        float pitch_trim_adjustment = ToRad((float)g.rc_2.control_in / 4000.0);
 
         // make sure accelerometer values impact attitude quickly
         ahrs.set_fast_gains(true);

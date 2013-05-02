@@ -3,15 +3,37 @@
 // Unit tests for the AP_Math euler code
 //
 
-#include <stdlib.h>
+#include <FastSerial.h>
 #include <AP_Common.h>
-#include <AP_Progmem.h>
-#include <AP_Param.h>
 #include <AP_Math.h>
-#include <AP_HAL.h>
 
-#include <AP_HAL_AVR.h>
-const AP_HAL::HAL& hal = AP_HAL_BOARD_DRIVER;
+FastSerialPort(Serial, 0);
+
+#ifdef DESKTOP_BUILD
+// all of this is needed to build with SITL
+ #include <SPI.h>
+ #include <I2C.h>
+ #include <DataFlash.h>
+ #include <APM_RC.h>
+ #include <GCS_MAVLink.h>
+ #include <Arduino_Mega_ISR_Registry.h>
+ #include <AP_PeriodicProcess.h>
+ #include <AP_ADC.h>
+ #include <AP_Baro.h>
+ #include <AP_Compass.h>
+ #include <AP_GPS.h>
+ #include <AP_Declination.h>
+ #include <AP_Semaphore.h>
+ #include <Filter.h>
+ #include <AP_Buffer.h>
+ #include <SITL.h>
+Arduino_Mega_ISR_Registry isr_registry;
+AP_Baro_BMP085_HIL barometer;
+AP_Compass_HIL compass;
+#endif
+
+
+
 
 static float rad_diff(float rad1, float rad2)
 {
@@ -22,7 +44,7 @@ static float rad_diff(float rad1, float rad2)
     if (diff < -PI) {
         diff += 2*PI;
     }
-    return fabsf(diff);
+    return fabs(diff);
 }
 
 static void check_result(float roll, float pitch, float yaw,
@@ -31,7 +53,7 @@ static void check_result(float roll, float pitch, float yaw,
     if (isnan(roll2) ||
         isnan(pitch2) ||
         isnan(yaw2)) {
-        hal.console->printf("NAN eulers roll=%f pitch=%f yaw=%f\n",
+        Serial.printf("NAN eulers roll=%f pitch=%f yaw=%f\n",
                       roll, pitch, yaw);
     }
 
@@ -50,17 +72,11 @@ static void check_result(float roll, float pitch, float yaw,
             ToDeg(rad_diff(pitch, PI/2)) < 1 ||
             ToDeg(rad_diff(pitch, -PI/2)) < 1) {
             // we expect breakdown at these poles
-            hal.console->printf_P(
-                    PSTR("breakdown eulers roll=%f/%f pitch=%f/%f yaw=%f/%f\n"),
-                          ToDeg(roll), ToDeg(roll2),
-                          ToDeg(pitch), ToDeg(pitch2),
-                          ToDeg(yaw), ToDeg(yaw2));
+            Serial.printf("breakdown eulers roll=%f/%f pitch=%f/%f yaw=%f/%f\n",
+                          ToDeg(roll), ToDeg(roll2), ToDeg(pitch), ToDeg(pitch2), ToDeg(yaw), ToDeg(yaw2));
         } else {
-            hal.console->printf_P(
-                    PSTR("incorrect eulers roll=%f/%f pitch=%f/%f yaw=%f/%f\n"),
-                          ToDeg(roll), ToDeg(roll2),
-                          ToDeg(pitch), ToDeg(pitch2),
-                          ToDeg(yaw), ToDeg(yaw2));
+            Serial.printf("incorrect eulers roll=%f/%f pitch=%f/%f yaw=%f/%f\n",
+                          ToDeg(roll), ToDeg(roll2), ToDeg(pitch), ToDeg(pitch2), ToDeg(yaw), ToDeg(yaw2));
         }
     }
 }
@@ -85,14 +101,14 @@ void test_matrix_eulers(void)
     uint8_t i, j, k;
     uint8_t N = ARRAY_LENGTH(angles);
 
-    hal.console->println("rotation matrix unit tests\n");
+    Serial.println("rotation matrix unit tests\n");
 
     for (i=0; i<N; i++)
         for (j=0; j<N; j++)
             for (k=0; k<N; k++)
                 test_euler(angles[i], angles[j], angles[k]);
 
-    hal.console->println("tests done\n");
+    Serial.println("tests done\n");
 }
 
 static void test_quaternion(float roll, float pitch, float yaw)
@@ -110,7 +126,7 @@ void test_quaternion_eulers(void)
     uint8_t i, j, k;
     uint8_t N = ARRAY_LENGTH(angles);
 
-    hal.console->println("quaternion unit tests\n");
+    Serial.println("quaternion unit tests\n");
 
     test_quaternion(PI/4, 0, 0);
     test_quaternion(0, PI/4, 0);
@@ -135,7 +151,7 @@ void test_quaternion_eulers(void)
             for (k=0; k<N; k++)
                 test_quaternion(angles[i], angles[j], angles[k]);
 
-    hal.console->println("tests done\n");
+    Serial.println("tests done\n");
 }
 
 
@@ -157,7 +173,7 @@ static void test_conversion(float roll, float pitch, float yaw)
     m2.from_euler(roll, pitch, yaw);
     m2.to_euler(&roll3, &pitch3, &yaw3);
     if (m.is_nan()) {
-        hal.console->printf("NAN matrix roll=%f pitch=%f yaw=%f\n",
+        Serial.printf("NAN matrix roll=%f pitch=%f yaw=%f\n",
                       roll, pitch, yaw);
     }
 
@@ -170,7 +186,7 @@ void test_conversions(void)
     uint8_t i, j, k;
     uint8_t N = ARRAY_LENGTH(angles);
 
-    hal.console->println("matrix/quaternion tests\n");
+    Serial.println("matrix/quaternion tests\n");
 
     test_conversion(1, 1.1, 1.2);
     test_conversion(1, -1.1, 1.2);
@@ -183,7 +199,7 @@ void test_conversions(void)
             for (k=0; k<N; k++)
                 test_conversion(angles[i], angles[j], angles[k]);
 
-    hal.console->println("tests done\n");
+    Serial.println("tests done\n");
 }
 
 void test_frame_transforms(void)
@@ -192,12 +208,12 @@ void test_frame_transforms(void)
     Quaternion q;
     Matrix3f m;
 
-    hal.console->println("frame transform tests\n");
+    Serial.println("frame transform tests\n");
 
     q.from_euler(ToRad(90), 0, 0);
     v2 = v = Vector3f(0, 0, 1);
     q.earth_to_body(v2);
-    hal.console->printf("%f %f %f\n", v2.x, v2.y, v2.z);
+    printf("%f %f %f\n", v2.x, v2.y, v2.z);
 }
 
 // generate a random float between -1 and 1
@@ -241,7 +257,7 @@ void test_matrix_rotate(void)
         float err = diff.a.length() + diff.b.length() + diff.c.length();
 
         if (err > 0) {
-            hal.console->printf("ERROR: i=%u err=%f\n", (unsigned)i, err);
+            Serial.printf("ERROR: i=%u err=%f\n", (unsigned)i, err);
         }
     }
 }
@@ -251,7 +267,8 @@ void test_matrix_rotate(void)
  */
 void setup(void)
 {
-    hal.console->println("euler unit tests\n");
+    Serial.begin(115200);
+    Serial.println("euler unit tests\n");
 
     test_conversion(0, PI, 0);
 
@@ -262,6 +279,7 @@ void setup(void)
     test_matrix_rotate();
 }
 
-void loop(void){}
-
-AP_HAL_MAIN();
+void
+loop(void)
+{
+}

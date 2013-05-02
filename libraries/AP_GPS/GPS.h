@@ -3,20 +3,18 @@
 /// @file	GPS.h
 /// @brief	Interface definition for the various GPS drivers.
 
-#ifndef __GPS_H__
-#define __GPS_H__
-
-#include <AP_HAL.h>
+#ifndef GPS_h
+#define GPS_h
 
 #include <inttypes.h>
-#include <AP_Progmem.h>
+#include <Stream.h>
+#include <avr/pgmspace.h>
 
 /// @class	GPS
 /// @brief	Abstract base class for GPS receiver drivers.
 class GPS
 {
 public:
-	GPS();
 
     /// Update GPS state based on possible bytes received from the module.
     ///
@@ -34,16 +32,7 @@ public:
     enum GPS_Status {
         NO_GPS = 0,             ///< No GPS connected/detected
         NO_FIX = 1,             ///< Receiving valid GPS messages but no lock
-        GPS_OK_FIX_2D = 2,      ///< Receiving valid messages and 2D lock
-        GPS_OK_FIX_3D = 3       ///< Receiving valid messages and 3D lock
-    };
-
-    /// Fix status codes
-    ///
-    enum Fix_Status {
-        FIX_NONE = 0,           ///< No fix
-        FIX_2D = 2,             ///< 2d fix
-        FIX_3D = 3,             ///< 3d fix
+        GPS_OK = 2              ///< Receiving valid messages and locked
     };
 
     // GPS navigation engine settings. Not all GPS receivers support
@@ -67,7 +56,7 @@ public:
     ///
     /// @returns			Current GPS status
     ///
-    GPS_Status          status(void) const {
+    GPS_Status          status(void) {
         return _status;
     }
 
@@ -96,7 +85,7 @@ public:
     ///
     /// Must be implemented by the GPS driver.
     ///
-    virtual void        init(AP_HAL::UARTDriver *s, enum GPS_Engine_Setting engine_setting = GPS_ENGINE_NONE) = 0;
+    virtual void        init(enum GPS_Engine_Setting engine_setting = GPS_ENGINE_NONE) = 0;
 
     // Properties
     uint32_t time;                      ///< GPS time (milliseconds from epoch)
@@ -115,7 +104,8 @@ public:
     /// already seen.
     bool new_data;
 
-    Fix_Status fix;                        ///< 0 if we have no fix, 2 for 2D fix, 3 for 3D fix
+    // Deprecated properties
+    bool fix;                           ///< true if we have a position fix (use ::status instead)
     bool valid_read;                    ///< true if we have seen data from the GPS (use ::status instead)
 
     // Debug support
@@ -125,15 +115,23 @@ public:
     virtual void setHIL(uint32_t time, float latitude, float longitude, float altitude,
                         float ground_speed, float ground_course, float speed_3d, uint8_t num_sats);
 
+    /// Time in milliseconds after which we will assume the GPS is no longer
+    /// sending us updates and attempt a re-init.
+    ///
+    /// 1200ms allows a small amount of slack over the worst-case 1Hz update
+    /// rate.
+    ///
+    uint32_t idleTimeout;
+
     // components of velocity in 2D, in m/s
     float velocity_north(void) {
-        return _status >= GPS_OK_FIX_2D ? _velocity_north : 0;
+        return _status == GPS_OK ? _velocity_north : 0;
     }
     float velocity_east(void)  {
-        return _status >= GPS_OK_FIX_2D ? _velocity_east  : 0;
+        return _status == GPS_OK ? _velocity_east  : 0;
     }
     float velocity_down(void)  {
-        return _status >= GPS_OK_FIX_3D ? _velocity_down  : 0;
+        return _status == GPS_OK ? _velocity_down  : 0;
     }
 
     // last ground speed in m/s. This can be used when we have no GPS
@@ -148,14 +146,21 @@ public:
     // the time we got our last fix in system milliseconds
     uint32_t last_fix_time;
 
-	// the time we last processed a message in milliseconds
-	uint32_t last_message_time_ms(void) { return _idleTimer; }
-
 	// return true if the GPS supports raw velocity values
 
 
 protected:
-    AP_HAL::UARTDriver *_port;   ///< port the GPS is attached to
+    Stream      *_port;                 ///< port the GPS is attached to
+
+    /// Constructor
+    ///
+    /// @note The stream is expected to be set up and configured for the
+    ///       correct bitrate before ::init is called.
+    ///
+    /// @param	s	Stream connected to the GPS module.
+    ///
+    GPS(Stream *s) : _port(s) {
+    };
 
     /// read from the GPS stream and update properties
     ///
@@ -171,14 +176,14 @@ protected:
     ///						long in the wrong byte order
     /// @returns			endian-swapped value
     ///
-    int32_t                             _swapl(const void *bytes) const;
+    int32_t                             _swapl(const void *bytes);
 
     /// perform an endian swap on an int
     ///
     /// @param	bytes		pointer to a buffer containing bytes representing an
     ///						int in the wrong byte order
     ///	@returns			endian-swapped value
-    int16_t                             _swapi(const void *bytes) const;
+    int16_t                             _swapi(const void *bytes);
 
     /// emit an error message
     ///
@@ -197,8 +202,8 @@ protected:
 
     enum GPS_Engine_Setting _nav_setting;
 
-    void _write_progstr_block(AP_HAL::UARTDriver *_fs, const prog_char *pstr, uint8_t size);
-    void _send_progstr(AP_HAL::UARTDriver *_fs, const prog_char *pstr, uint8_t size);
+    void _write_progstr_block(Stream *_fs, const prog_char *pstr, uint8_t size);
+    void _send_progstr(Stream *_fs, const prog_char *pstr, uint8_t size);
     void _update_progstr(void);
 
     // velocities in cm/s if available from the GPS
@@ -208,9 +213,6 @@ protected:
 
     // does this GPS support raw velocity numbers?
     bool _have_raw_velocity;
-
-	// detected baudrate
-	uint16_t _baudrate;
 
 private:
 
@@ -231,4 +233,36 @@ private:
     float _velocity_down;
 };
 
-#endif // __GPS_H__
+inline int32_t
+GPS::_swapl(const void *bytes)
+{
+    const uint8_t       *b = (const uint8_t *)bytes;
+    union {
+        int32_t v;
+        uint8_t b[4];
+    } u;
+
+    u.b[0] = b[3];
+    u.b[1] = b[2];
+    u.b[2] = b[1];
+    u.b[3] = b[0];
+
+    return(u.v);
+}
+
+inline int16_t
+GPS::_swapi(const void *bytes)
+{
+    const uint8_t       *b = (const uint8_t *)bytes;
+    union {
+        int16_t v;
+        uint8_t b[2];
+    } u;
+
+    u.b[0] = b[1];
+    u.b[1] = b[0];
+
+    return(u.v);
+}
+
+#endif
